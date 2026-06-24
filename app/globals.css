@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  /* Fundo neutro fora do "celular" para dar contexto de mock */
+  background-color: #e7e5e4; /* stone-200 */
+}
+
+/* Esconde a barra de rolagem horizontal das listas roláveis (categorias, chips) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
