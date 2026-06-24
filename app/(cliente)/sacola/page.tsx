@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,11 +12,12 @@ import {
   CreditCard,
   Banknote,
   QrCode,
+  Plus,
 } from "lucide-react";
 import { useCarrinho } from "@/lib/store";
-import { getLoja, validarCupom, criarPedido } from "@/lib/repo";
+import { getLoja, validarCupom, criarPedido, listarEnderecos } from "@/lib/repo";
 import { useAsync } from "@/lib/useAsync";
-import { enderecos } from "@/lib/data";
+import { usePreferencias } from "@/lib/preferencias";
 import { brl, precoComDesconto } from "@/lib/format";
 import { MINIMO_FRETE_GRATIS } from "@/lib/config";
 import { SeletorQuantidade } from "@/components/cliente/SeletorQuantidade";
@@ -45,14 +46,23 @@ export default function SacolaPage() {
   );
   const loja = lojaAsync.data;
 
+  const enderecosAsync = useAsync(listarEnderecos, []);
+  const enderecos = useMemo(() => enderecosAsync.data ?? [], [enderecosAsync.data]);
+  const pagamentoPadrao = usePreferencias((s) => s.pagamentoPadrao);
+
   const [codigoCupom, setCodigoCupom] = useState("");
   const [cupom, setCupom] = useState<Cupom | null>(null);
   const [erroCupom, setErroCupom] = useState("");
   const [validandoCupom, setValidandoCupom] = useState(false);
-  const [enderecoId, setEnderecoId] = useState(enderecos[0]?.id ?? "");
-  const [pagamento, setPagamento] = useState<FormaPagamento>("pix");
+  const [enderecoId, setEnderecoId] = useState("");
+  const [pagamento, setPagamento] = useState<FormaPagamento>(pagamentoPadrao);
   const [finalizando, setFinalizando] = useState(false);
   const [erroFinalizar, setErroFinalizar] = useState("");
+
+  // Seleciona o primeiro endereço assim que a lista carrega.
+  useEffect(() => {
+    if (!enderecoId && enderecos.length) setEnderecoId(enderecos[0].id);
+  }, [enderecos, enderecoId]);
 
   const { frete, desconto, total } = useMemo(() => {
     if (!loja) return { frete: 0, desconto: 0, total: 0 };
@@ -106,6 +116,7 @@ export default function SacolaPage() {
         total,
         formaPagamento: pagamento,
         cupomCodigo: cupom?.codigo,
+        enderecoId: endereco?.id,
         enderecoResumo: endereco
           ? `${endereco.rua}, ${endereco.numero} — ${endereco.apelido}`
           : "Endereço não informado",
@@ -229,6 +240,14 @@ export default function SacolaPage() {
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-stone-700">
           <MapPin size={16} /> Entregar em
         </h2>
+        {enderecos.length === 0 && !enderecosAsync.loading && (
+          <Link
+            href="/perfil/enderecos"
+            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-orange-300 py-3 text-sm font-semibold text-orange-600"
+          >
+            <Plus size={16} /> Cadastrar endereço de entrega
+          </Link>
+        )}
         <div className="flex flex-col gap-2">
           {enderecos.map((e) => {
             const ativo = enderecoId === e.id;
@@ -266,6 +285,14 @@ export default function SacolaPage() {
             );
           })}
         </div>
+        {enderecos.length > 0 && (
+          <Link
+            href="/perfil/enderecos"
+            className="mt-2 block text-center text-xs font-semibold text-orange-600"
+          >
+            + Gerenciar endereços
+          </Link>
+        )}
       </section>
 
       {/* Pagamento */}

@@ -3,10 +3,12 @@ import * as mock from "@/lib/data";
 import { useLojista } from "@/lib/lojista";
 import { usePedidos, novoNumeroPedido } from "@/lib/pedidos";
 import { useSessao } from "@/lib/sessao";
+import { useEnderecos } from "@/lib/enderecos";
 import { precoComDesconto } from "@/lib/format";
 import type {
   Categoria,
   Cupom,
+  Endereco,
   FormaPagamento,
   ItemCarrinho,
   Loja,
@@ -276,6 +278,7 @@ export interface NovoPedidoInput {
   total: number;
   formaPagamento: FormaPagamento;
   cupomCodigo?: string;
+  enderecoId?: string;
   enderecoResumo: string;
 }
 
@@ -326,6 +329,7 @@ export async function criarPedido(input: NovoPedidoInput): Promise<string> {
       cliente_id: clienteId,
       cliente_nome: useSessao.getState().usuario?.nome ?? null,
       loja_id: input.loja.id,
+      endereco_id: input.enderecoId ?? null,
       endereco_resumo: input.enderecoResumo,
       status: "Novo",
       subtotal: input.subtotal,
@@ -373,6 +377,127 @@ export async function getPedido(id: string): Promise<Pedido | null> {
     .maybeSingle();
   if (error) throw error;
   return data ? mapPedido(data) : null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PERFIL DO CLIENTE — dados pessoais e endereços
+// ═══════════════════════════════════════════════════════════════
+
+export interface MeuPerfil {
+  nome: string;
+  telefone: string;
+  email: string;
+}
+
+export async function getMeuPerfil(): Promise<MeuPerfil> {
+  const u = useSessao.getState().usuario;
+  if (!supabase) {
+    return { nome: u?.nome ?? "", telefone: "", email: u?.email ?? "" };
+  }
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth.user;
+  if (!user) return { nome: "", telefone: "", email: "" };
+  const { data } = await supabase
+    .from("perfis")
+    .select("nome, telefone")
+    .eq("id", user.id)
+    .maybeSingle();
+  return {
+    nome: data?.nome ?? u?.nome ?? "",
+    telefone: data?.telefone ?? "",
+    email: user.email ?? "",
+  };
+}
+
+export async function atualizarMeuPerfil(patch: {
+  nome?: string;
+  telefone?: string;
+}): Promise<void> {
+  // Reflete o nome na sessão local (header do perfil, etc.).
+  if (patch.nome) {
+    const s = useSessao.getState();
+    if (s.usuario) s.entrar({ ...s.usuario, nome: patch.nome });
+  }
+  if (!supabase) return;
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return;
+  const { error } = await supabase
+    .from("perfis")
+    .update(patch)
+    .eq("id", auth.user.id);
+  if (error) throw error;
+}
+
+interface EnderecoRow {
+  id: string;
+  apelido: string | null;
+  rua: string | null;
+  numero: string | null;
+  complemento: string | null;
+  cidade: string | null;
+  cep: string | null;
+}
+
+function mapEndereco(r: EnderecoRow): Endereco {
+  return {
+    id: r.id,
+    apelido: r.apelido ?? "",
+    rua: r.rua ?? "",
+    numero: r.numero ?? "",
+    complemento: r.complemento ?? undefined,
+    cidade: r.cidade ?? "",
+    cep: r.cep ?? "",
+  };
+}
+
+export async function listarEnderecos(): Promise<Endereco[]> {
+  if (!supabase) return useEnderecos.getState().lista;
+  const { data, error } = await supabase
+    .from("enderecos")
+    .select("*")
+    .order("apelido");
+  if (error) throw error;
+  return (data ?? []).map(mapEndereco);
+}
+
+export async function criarEndereco(e: Omit<Endereco, "id">): Promise<void> {
+  if (!supabase) {
+    useEnderecos.getState().add(e);
+    return;
+  }
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error("Faça login para salvar endereços.");
+  const { error } = await supabase.from("enderecos").insert({
+    usuario_id: auth.user.id,
+    apelido: e.apelido,
+    rua: e.rua,
+    numero: e.numero,
+    complemento: e.complemento ?? null,
+    cidade: e.cidade,
+    cep: e.cep,
+  });
+  if (error) throw error;
+}
+
+export async function atualizarEndereco(
+  id: string,
+  patch: Partial<Omit<Endereco, "id">>,
+): Promise<void> {
+  if (!supabase) {
+    useEnderecos.getState().update(id, patch);
+    return;
+  }
+  const { error } = await supabase.from("enderecos").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function excluirEndereco(id: string): Promise<void> {
+  if (!supabase) {
+    useEnderecos.getState().remove(id);
+    return;
+  }
+  const { error } = await supabase.from("enderecos").delete().eq("id", id);
+  if (error) throw error;
 }
 
 // ═══════════════════════════════════════════════════════════════

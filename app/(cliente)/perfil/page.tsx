@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { useSessao } from "@/lib/sessao";
 import { sair } from "@/lib/auth";
-import { enderecos } from "@/lib/data";
 import { BottomNav } from "@/components/cliente/BottomNav";
 import { clsx } from "@/lib/cx";
 
@@ -30,14 +30,9 @@ export default function PerfilPage() {
     {
       titulo: "Conta",
       itens: [
-        { icon: User, label: "Dados pessoais", onClick: () => {} },
-        {
-          icon: MapPin,
-          label: "Endereços",
-          badge: `${enderecos.length}`,
-          onClick: () => {},
-        },
-        { icon: CreditCard, label: "Formas de pagamento", onClick: () => {} },
+        { icon: User, label: "Dados pessoais", href: "/perfil/dados" },
+        { icon: MapPin, label: "Endereços", href: "/perfil/enderecos" },
+        { icon: CreditCard, label: "Formas de pagamento", href: "/perfil/pagamento" },
       ],
     },
     {
@@ -46,16 +41,16 @@ export default function PerfilPage() {
         {
           icon: Store,
           label: "Sou lojista — acessar painel",
+          href: "/lojista",
           destaque: true,
-          onClick: () => router.push("/lojista"),
         },
       ],
     },
     {
       titulo: "Preferências",
       itens: [
-        { icon: Bell, label: "Notificações", onClick: () => {} },
-        { icon: HelpCircle, label: "Ajuda e suporte", onClick: () => {} },
+        { icon: Bell, label: "Notificações", href: "/perfil/notificacoes" },
+        { icon: HelpCircle, label: "Ajuda e suporte", href: "/perfil/ajuda" },
       ],
     },
   ];
@@ -87,9 +82,9 @@ export default function PerfilPage() {
             </h2>
             <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white">
               {grupo.itens.map((item, i) => (
-                <button
+                <Link
                   key={item.label}
-                  onClick={item.onClick}
+                  href={item.href}
                   className={clsx(
                     "flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-stone-50",
                     i > 0 && "border-t border-stone-100",
@@ -113,13 +108,8 @@ export default function PerfilPage() {
                   >
                     {item.label}
                   </span>
-                  {"badge" in item && item.badge && (
-                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">
-                      {item.badge}
-                    </span>
-                  )}
                   <ChevronRight size={18} className="text-stone-300" />
-                </button>
+                </Link>
               ))}
             </div>
           </section>
