@@ -72,6 +72,11 @@ function extrairSugestoes(texto: string): { produtoId: string; quantidade: numbe
   }
 }
 
+// Detecta sobrecarga temporária do Gemini (503 / "high demand").
+function ehSobrecarga(msg: string): boolean {
+  return /\b503\b|overloaded|high demand|service unavailable|unavailable/i.test(msg);
+}
+
 function limparTexto(texto: string): string {
   return texto
     .replace(/```json[\s\S]*?```/g, "")
@@ -118,7 +123,21 @@ export async function POST(req: Request) {
 
     const chat = model.startChat({ history: historicoGemini });
 
-    const resultado = await chat.sendMessage(mensagem);
+    // O Gemini às vezes responde 503 (sobrecarga). Tentamos algumas vezes.
+    let resultado: Awaited<ReturnType<typeof chat.sendMessage>> | undefined;
+    let ultimoErro = "";
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      try {
+        resultado = await chat.sendMessage(mensagem);
+        break;
+      } catch (err) {
+        ultimoErro = err instanceof Error ? err.message : String(err);
+        if (!ehSobrecarga(ultimoErro) || tentativa === 2) throw err;
+        await new Promise((r) => setTimeout(r, 1200 * (tentativa + 1)));
+      }
+    }
+    if (!resultado) throw new Error(ultimoErro || "Sem resposta do assistente.");
+
     const textoBruto = resultado.response.text();
 
     return Response.json({
@@ -127,6 +146,14 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro desconhecido";
+    // Sobrecarga do Google: mensagem amigável (não é erro do app).
+    if (ehSobrecarga(msg)) {
+      return Response.json({
+        resposta_texto:
+          "Tô a mil por hora aqui na obra agora 👷 — me manda a pergunta de novo daqui a uns segundinhos que eu respondo!",
+        sugestoes: [],
+      });
+    }
     return Response.json({ erro: `Falha no assistente: ${msg}` }, { status: 500 });
   }
 }
