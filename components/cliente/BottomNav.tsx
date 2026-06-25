@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ClipboardList, ShoppingBag, User } from "lucide-react";
+import { Home, ClipboardList, HardHat, ShoppingBag, User } from "lucide-react";
 import { clsx } from "@/lib/cx";
 import { useCarrinho } from "@/lib/store";
 
@@ -16,6 +16,7 @@ type ItemNav = {
 const itens: ItemNav[] = [
   { href: "/home", label: "Início", icon: Home },
   { href: "/pedidos", label: "Pedidos", icon: ClipboardList },
+  { href: "/construtor", label: "Meu Construtor", icon: HardHat },
   { href: "/sacola", label: "Sacola", icon: ShoppingBag, badge: true },
   { href: "/perfil", label: "Perfil", icon: User },
 ];
@@ -34,7 +35,7 @@ export function BottomNav() {
               <Link
                 href={href}
                 className={clsx(
-                  "relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition",
+                  "relative flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-center text-[10px] font-medium leading-tight transition",
                   ativo ? "text-orange-600" : "text-stone-400",
                 )}
               >
