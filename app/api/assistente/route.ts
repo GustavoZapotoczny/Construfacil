@@ -106,12 +106,17 @@ export async function POST(req: Request) {
       systemInstruction: montarSystemPrompt(catalogo),
     });
 
-    const chat = model.startChat({
-      history: historico.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
-    });
+    const historicoGemini = historico.map((m) => ({
+      role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+      parts: [{ text: m.content }],
+    }));
+    // O Gemini exige que o histórico comece com 'user'. A 1ª mensagem do
+    // app é a saudação (model), então descartamos qualquer 'model' inicial.
+    while (historicoGemini.length > 0 && historicoGemini[0].role !== "user") {
+      historicoGemini.shift();
+    }
+
+    const chat = model.startChat({ history: historicoGemini });
 
     const resultado = await chat.sendMessage(mensagem);
     const textoBruto = resultado.response.text();
