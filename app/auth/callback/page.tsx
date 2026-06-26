@@ -23,8 +23,14 @@ export default function AuthCallbackPage() {
         const params = new URLSearchParams(window.location.search);
         const code = params.get("code");
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+          // O cliente (detectSessionInUrl) pode já ter trocado o código.
+          // Tentamos trocar, mas ignoramos o erro de "código já usado" —
+          // a verdade é a sessão, conferida logo abaixo.
+          await supabase.auth.exchangeCodeForSession(code).catch(() => {});
+        }
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          throw new Error("Sessão não encontrada após o login.");
         }
         const tipo = await sincronizarSessao();
         router.replace(tipo === "lojista" ? "/lojista" : "/home");
