@@ -224,7 +224,7 @@ export default function ConstrutorPage() {
       </div>
 
       {/* Campo de entrada */}
-      <div className="fixed inset-x-0 bottom-[57px] z-20 mx-auto max-w-md border-t border-stone-200 bg-white px-3 py-2.5">
+      <div className="fixed inset-x-0 bottom-[57px] z-20 mx-auto max-w-md border-t border-stone-200 bg-white px-3 py-2.5 md:bottom-0 md:left-60 md:max-w-4xl">
         <form
           onSubmit={(e) => {
             e.preventDefault();

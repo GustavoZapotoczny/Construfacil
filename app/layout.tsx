@@ -44,7 +44,9 @@ export default function RootLayout({
         {/* Container "celular": tudo dentro de max-w-md centralizado */}
         <AuthBootstrap />
         <ServiceWorker />
-        <div className="mx-auto min-h-screen max-w-md bg-stone-50 shadow-xl">
+        {/* Mobile: coluna "celular" centralizada. Desktop (md+): largura total
+            — o menu lateral e o recuo do conteúdo ficam nos layouts de seção. */}
+        <div className="mx-auto min-h-screen max-w-md bg-stone-50 shadow-xl md:max-w-none md:shadow-none">
           {children}
         </div>
       </body>

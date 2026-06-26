@@ -355,7 +355,7 @@ export default function SacolaPage() {
       </section>
 
       {/* Botão fixo finalizar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-100 bg-white p-4">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-100 bg-white p-4 md:left-60 md:max-w-4xl">
         {erroFinalizar && (
           <p className="mb-2 text-center text-xs text-red-600">{erroFinalizar}</p>
         )}

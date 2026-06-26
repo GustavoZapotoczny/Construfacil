@@ -173,7 +173,7 @@ export default function EntregaPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-100 bg-white p-4">
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-100 bg-white p-4 md:left-60 md:max-w-6xl">
         {ok && (
           <p className="mb-2 text-center text-xs font-medium text-green-600">
             Área de entrega salva! ✓

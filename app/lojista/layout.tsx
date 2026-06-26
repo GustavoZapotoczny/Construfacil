@@ -1,9 +1,14 @@
 import { ProtegerLojista } from "@/components/lojista/ProtegerLojista";
+import { LojistaShell } from "@/components/lojista/LojistaShell";
 
 export default function LojistaLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <ProtegerLojista>{children}</ProtegerLojista>;
+  return (
+    <ProtegerLojista>
+      <LojistaShell>{children}</LojistaShell>
+    </ProtegerLojista>
+  );
 }

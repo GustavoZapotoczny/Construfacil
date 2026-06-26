@@ -32,7 +32,7 @@ export function LojistaNav() {
   const novos = authDisponivel ? 0 : novosDemo;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white">
+    <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white md:hidden">
       <ul className="flex">
         {itens.map(({ href, label, icon: Icon, badgeNovos }) => {
           const ativo =
