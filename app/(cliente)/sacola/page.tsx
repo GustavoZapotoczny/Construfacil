@@ -13,6 +13,7 @@ import {
   Banknote,
   QrCode,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { useCarrinho } from "@/lib/store";
 import { getLoja, validarCupom, criarPedido, listarEnderecos } from "@/lib/repo";
@@ -38,7 +39,12 @@ export default function SacolaPage() {
   const subtotal = useCarrinho((s) => s.subtotal());
   const lojaId = useCarrinho((s) => s.lojaId);
   const definirQuantidade = useCarrinho((s) => s.definirQuantidade);
+  const remover = useCarrinho((s) => s.remover);
   const limpar = useCarrinho((s) => s.limpar);
+
+  function esvaziarSacola() {
+    if (window.confirm("Tem certeza que deseja esvaziar a sacola?")) limpar();
+  }
 
   const lojaAsync = useAsync(
     async () => (lojaId ? await getLoja(lojaId) : null),
@@ -167,6 +173,18 @@ export default function SacolaPage() {
 
       {/* Itens */}
       <section className="bg-white px-4">
+        <div className="flex items-center justify-between border-b border-stone-100 py-3">
+          <h2 className="text-sm font-semibold text-stone-700">
+            {linhas.length} {linhas.length === 1 ? "item" : "itens"}
+          </h2>
+          <button
+            type="button"
+            onClick={esvaziarSacola}
+            className="flex items-center gap-1 text-xs font-medium text-stone-400 transition hover:text-red-500"
+          >
+            <Trash2 size={14} /> Esvaziar sacola
+          </button>
+        </div>
         <div className="divide-y divide-stone-100">
           {linhas.map(({ produto, quantidade }) => (
             <div key={produto.id} className="flex items-center gap-3 py-3">
@@ -193,13 +211,22 @@ export default function SacolaPage() {
                   {brl(precoComDesconto(produto) * quantidade)}
                 </p>
               </div>
-              <SeletorQuantidade
-                quantidade={quantidade}
-                onIncrementar={() => definirQuantidade(produto.id, quantidade + 1)}
-                onDecrementar={() => definirQuantidade(produto.id, quantidade - 1)}
-                lixeiraNoUm
-                tamanho="sm"
-              />
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => remover(produto.id)}
+                  aria-label="Remover item da sacola"
+                  className="text-stone-400 transition hover:text-red-500"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <SeletorQuantidade
+                  quantidade={quantidade}
+                  onIncrementar={() => definirQuantidade(produto.id, quantidade + 1)}
+                  onDecrementar={() => definirQuantidade(produto.id, quantidade - 1)}
+                  tamanho="sm"
+                />
+              </div>
             </div>
           ))}
         </div>
