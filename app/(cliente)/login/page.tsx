@@ -47,9 +47,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col">
       {/* Topo laranja com a marca */}
       <div className="bg-gradient-to-b from-orange-500 to-orange-600 px-6 pb-10 pt-16 text-center text-white">
-        <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/20 text-5xl backdrop-blur">
-          🏗️
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="ConstruZap"
+          className="mx-auto mb-3 h-24 w-24 rounded-3xl object-cover shadow-lg"
+        />
         <h1 className="text-2xl font-bold">ConstruZap</h1>
         <p className="mt-1 text-sm text-orange-50">
           Materiais de construção na sua obra

@@ -25,7 +25,8 @@ export function SidebarNav() {
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-screen w-60 flex-col border-r border-stone-200 bg-white md:flex">
       <div className="flex items-center gap-2 px-6 py-6">
-        <span className="text-2xl">🏗️</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="ConstruZap" className="h-9 w-9 rounded-lg object-cover" />
         <span className="text-lg font-bold text-stone-800">ConstruZap</span>
       </div>
       <nav className="flex flex-col gap-1 px-3">
