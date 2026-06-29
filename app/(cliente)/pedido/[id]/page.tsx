@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Home, ClipboardList, Circle } from "lucide-react";
-import { getPedido } from "@/lib/repo";
+import { CheckCircle2, Home, ClipboardList, Circle, PackageCheck } from "lucide-react";
+import { getPedido, atualizarStatusPedido } from "@/lib/repo";
 import { useAsync } from "@/lib/useAsync";
 import { brl, dataHora } from "@/lib/format";
 import { Botao } from "@/components/ui/Botao";
@@ -16,6 +17,7 @@ const ETAPAS: StatusPedido[] = [
   "Pronto",
   "A caminho",
   "Entregue",
+  "Concluído",
 ];
 
 const ROTULOS: Record<StatusPedido, string> = {
@@ -24,6 +26,7 @@ const ROTULOS: Record<StatusPedido, string> = {
   Pronto: "Pronto para envio",
   "A caminho": "A caminho",
   Entregue: "Entregue",
+  "Concluído": "Recebido (confirmado por você)",
   Cancelado: "Cancelado",
 };
 
@@ -33,7 +36,24 @@ export default function PedidoPage({
   params: { id: string };
 }) {
   const { id } = params;
-  const { data: pedido, loading } = useAsync(() => getPedido(id), [id]);
+  const { data: pedido, loading, reload } = useAsync(() => getPedido(id), [id]);
+  const [confirmando, setConfirmando] = useState(false);
+  const [erroConfirmar, setErroConfirmar] = useState("");
+
+  async function confirmarRecebimento() {
+    setErroConfirmar("");
+    setConfirmando(true);
+    try {
+      await atualizarStatusPedido(id, "Concluído");
+      reload();
+    } catch (e) {
+      setErroConfirmar(
+        e instanceof Error ? e.message : "Não foi possível confirmar. Tente novamente.",
+      );
+    } finally {
+      setConfirmando(false);
+    }
+  }
 
   if (loading) return <Carregando texto="Carregando pedido…" />;
 
@@ -107,6 +127,42 @@ export default function PedidoPage({
           })}
         </ol>
       </section>
+
+      {/* Confirmação de recebimento (modelo "cofre") */}
+      {pedido.status === "Entregue" && (
+        <section className="px-6 pt-4">
+          <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-center">
+            <PackageCheck className="mx-auto text-orange-600" size={28} />
+            <p className="mt-2 text-sm font-semibold text-stone-800">
+              Você já recebeu seu pedido?
+            </p>
+            <p className="mt-0.5 text-xs text-stone-500">
+              Confirme o recebimento para concluir. O valor só é repassado à loja
+              depois que você confirma.
+            </p>
+            {erroConfirmar && (
+              <p className="mt-2 text-xs text-red-600">{erroConfirmar}</p>
+            )}
+            <Botao
+              className="mt-3"
+              bloco
+              onClick={confirmarRecebimento}
+              disabled={confirmando}
+            >
+              <CheckCircle2 size={18} />
+              {confirmando ? "Confirmando…" : "Confirmar recebimento"}
+            </Botao>
+          </div>
+        </section>
+      )}
+      {pedido.status === "Concluído" && (
+        <section className="px-6 pt-4">
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+            <PackageCheck size={20} className="shrink-0" />
+            Recebimento confirmado — pedido concluído. Obrigado! ✅
+          </div>
+        </section>
+      )}
 
       {/* Itens */}
       <section className="mt-2 px-6">

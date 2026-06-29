@@ -4,6 +4,7 @@ export type StatusPedido =
   | "Pronto"
   | "A caminho"
   | "Entregue"
+  | "Concluído"
   | "Cancelado";
 
 export type TipoUsuario = "cliente" | "lojista";

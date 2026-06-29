@@ -80,7 +80,7 @@ create table if not exists public.pedidos (
   endereco_id uuid references public.enderecos on delete set null,
   endereco_resumo text,              -- snapshot do endereço de entrega
   status text not null default 'Novo'
-    check (status in ('Novo','Em preparo','Pronto','A caminho','Entregue','Cancelado')),
+    check (status in ('Novo','Em preparo','Pronto','A caminho','Entregue','Concluído','Cancelado')),
   subtotal numeric not null default 0,
   frete numeric not null default 0,
   desconto numeric not null default 0,

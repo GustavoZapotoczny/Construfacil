@@ -15,6 +15,7 @@ const CORES_STATUS: Record<StatusPedido, string> = {
   Pronto: "bg-blue-100 text-blue-700",
   "A caminho": "bg-indigo-100 text-indigo-700",
   Entregue: "bg-green-100 text-green-700",
+  "Concluído": "bg-emerald-100 text-emerald-700",
   Cancelado: "bg-stone-200 text-stone-600",
 };
 
