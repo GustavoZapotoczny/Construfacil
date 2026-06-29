@@ -22,6 +22,7 @@ import { usePreferencias } from "@/lib/preferencias";
 import { brl, precoComDesconto } from "@/lib/format";
 import { MINIMO_FRETE_GRATIS } from "@/lib/config";
 import { SeletorQuantidade } from "@/components/cliente/SeletorQuantidade";
+import { PagamentoBrick } from "@/components/cliente/PagamentoBrick";
 import { Botao } from "@/components/ui/Botao";
 import { Carregando } from "@/components/ui/Estados";
 import { clsx } from "@/lib/cx";
@@ -64,6 +65,7 @@ export default function SacolaPage() {
   const [pagamento, setPagamento] = useState<FormaPagamento>(pagamentoPadrao);
   const [finalizando, setFinalizando] = useState(false);
   const [erroFinalizar, setErroFinalizar] = useState("");
+  const [mostrarPagamento, setMostrarPagamento] = useState(false);
 
   // Seleciona o primeiro endereço assim que a lista carrega.
   useEffect(() => {
@@ -107,9 +109,19 @@ export default function SacolaPage() {
     }
   }
 
-  async function finalizar() {
+  function abrirPagamento() {
     if (!loja) return;
+    if (enderecos.length > 0 && !enderecoId) {
+      setErroFinalizar("Selecione um endereço de entrega.");
+      return;
+    }
     setErroFinalizar("");
+    setMostrarPagamento(true);
+  }
+
+  // Chamado pelo PagamentoBrick quando o pagamento é confirmado (cartão/Pix).
+  async function concluirPedido() {
+    if (!loja) return;
     setFinalizando(true);
     const endereco = enderecos.find((e) => e.id === enderecoId);
     try {
@@ -132,7 +144,9 @@ export default function SacolaPage() {
     } catch (e) {
       setFinalizando(false);
       setErroFinalizar(
-        e instanceof Error ? e.message : "Não foi possível finalizar o pedido.",
+        e instanceof Error
+          ? e.message
+          : "Pagamento aprovado, mas houve um erro ao registrar o pedido. Fale com o suporte.",
       );
     }
   }
@@ -386,11 +400,44 @@ export default function SacolaPage() {
         {erroFinalizar && (
           <p className="mb-2 text-center text-xs text-red-600">{erroFinalizar}</p>
         )}
-        <Botao bloco onClick={finalizar} disabled={finalizando}>
+        <Botao bloco onClick={abrirPagamento} disabled={finalizando}>
           <ShoppingBag size={18} />
-          {finalizando ? "Finalizando…" : `Finalizar pedido · ${brl(total)}`}
+          {finalizando ? "Finalizando…" : `Pagar · ${brl(total)}`}
         </Botao>
       </div>
+
+      {/* Modal de pagamento (Pix + cartão dentro do app) */}
+      {mostrarPagamento && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center"
+          onClick={() => !finalizando && setMostrarPagamento(false)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 md:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-stone-800">Pagamento</h2>
+              <button
+                onClick={() => setMostrarPagamento(false)}
+                aria-label="Fechar"
+                className="text-xl leading-none text-stone-400"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-stone-500">
+              Total a pagar:{" "}
+              <span className="font-bold text-stone-800">{brl(total)}</span>
+            </p>
+            <PagamentoBrick
+              valor={total}
+              descricao={`Pedido • ${loja.nome}`}
+              onAprovado={() => concluirPedido()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

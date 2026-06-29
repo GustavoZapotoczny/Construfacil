@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, ClipboardList, HardHat, ShoppingBag, User } from "lucide-react";
 import { clsx } from "@/lib/cx";
 import { useCarrinho } from "@/lib/store";
+import { useMontado } from "@/lib/useMontado";
 
 const itens = [
   { href: "/home", label: "Início", icon: Home },
@@ -19,6 +20,7 @@ const itens = [
 export function SidebarNav() {
   const pathname = usePathname();
   const totalItens = useCarrinho((s) => s.totalItens());
+  const montado = useMontado();
 
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-screen w-60 flex-col border-r border-stone-200 bg-white md:flex">
@@ -42,7 +44,7 @@ export function SidebarNav() {
             >
               <span className="relative">
                 <Icon size={20} strokeWidth={ativo ? 2.4 : 2} />
-                {badge && totalItens > 0 && (
+                {badge && montado && totalItens > 0 && (
                   <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
                     {totalItens}
                   </span>

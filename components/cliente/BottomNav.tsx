@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, ClipboardList, HardHat, ShoppingBag, User } from "lucide-react";
 import { clsx } from "@/lib/cx";
 import { useCarrinho } from "@/lib/store";
+import { useMontado } from "@/lib/useMontado";
 
 type ItemNav = {
   href: string;
@@ -24,6 +25,7 @@ const itens: ItemNav[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const totalItens = useCarrinho((s) => s.totalItens());
+  const montado = useMontado();
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white md:hidden">
@@ -41,7 +43,7 @@ export function BottomNav() {
               >
                 <span className="relative">
                   <Icon size={22} strokeWidth={ativo ? 2.4 : 2} />
-                  {badge && totalItens > 0 && (
+                  {badge && montado && totalItens > 0 && (
                     <span className="absolute -right-2.5 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
                       {totalItens}
                     </span>

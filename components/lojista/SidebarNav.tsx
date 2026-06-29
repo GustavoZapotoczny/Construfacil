@@ -6,6 +6,7 @@ import { LayoutDashboard, Receipt, Package, Megaphone, Store } from "lucide-reac
 import { clsx } from "@/lib/cx";
 import { useLojista } from "@/lib/lojista";
 import { authDisponivel } from "@/lib/auth";
+import { useMontado } from "@/lib/useMontado";
 
 const itens = [
   { href: "/lojista", label: "Início", icon: LayoutDashboard },
@@ -21,7 +22,8 @@ export function LojistaSidebarNav() {
   const novosDemo = useLojista(
     (s) => s.pedidos.filter((p) => p.status === "Novo").length,
   );
-  const novos = authDisponivel ? 0 : novosDemo;
+  const montado = useMontado();
+  const novos = authDisponivel || !montado ? 0 : novosDemo;
 
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-screen w-60 flex-col border-r border-stone-200 bg-white md:flex">

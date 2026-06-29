@@ -6,6 +6,7 @@ import { LayoutDashboard, Receipt, Package, Megaphone, Store } from "lucide-reac
 import { clsx } from "@/lib/cx";
 import { useLojista } from "@/lib/lojista";
 import { authDisponivel } from "@/lib/auth";
+import { useMontado } from "@/lib/useMontado";
 
 type ItemNav = {
   href: string;
@@ -29,7 +30,8 @@ export function LojistaNav() {
   const novosDemo = useLojista(
     (s) => s.pedidos.filter((p) => p.status === "Novo").length,
   );
-  const novos = authDisponivel ? 0 : novosDemo;
+  const montado = useMontado();
+  const novos = authDisponivel || !montado ? 0 : novosDemo;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white md:hidden">
