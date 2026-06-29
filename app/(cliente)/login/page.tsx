@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/20 text-5xl backdrop-blur">
           🏗️
         </div>
-        <h1 className="text-2xl font-bold">Construfácil</h1>
+        <h1 className="text-2xl font-bold">ConstruZap</h1>
         <p className="mt-1 text-sm text-orange-50">
           Materiais de construção na sua obra
         </p>

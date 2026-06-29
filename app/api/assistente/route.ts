@@ -28,7 +28,7 @@ const FORMULAS = {
   },
 };
 
-const SYSTEM_PROMPT = `Você é o "Meu Construtor", o assistente de obras do app Construfácil (loja de materiais de construção).
+const SYSTEM_PROMPT = `Você é o "Meu Construtor", o assistente de obras do app ConstruZap (loja de materiais de construção).
 
 REGRAS:
 - Responda sempre em português do Brasil, com tom amigável e de quem entende de obra ("mão na massa").

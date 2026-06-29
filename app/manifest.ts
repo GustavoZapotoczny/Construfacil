@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Construfácil — Materiais de construção",
-    short_name: "Construfácil",
+    name: "ConstruZap — Materiais de construção",
+    short_name: "ConstruZap",
     description:
       "Marketplace de materiais de construção com entrega na obra. Peça cimento, tijolos, tintas e ferramentas como num delivery.",
     start_url: "/home",

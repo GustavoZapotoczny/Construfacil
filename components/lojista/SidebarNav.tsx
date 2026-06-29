@@ -30,7 +30,7 @@ export function LojistaSidebarNav() {
       <div className="flex items-center gap-2 px-6 py-6">
         <span className="text-2xl">🏗️</span>
         <div className="leading-tight">
-          <span className="block text-base font-bold text-stone-800">Construfácil</span>
+          <span className="block text-base font-bold text-stone-800">ConstruZap</span>
           <span className="block text-xs text-stone-400">Painel do lojista</span>
         </div>
       </div>

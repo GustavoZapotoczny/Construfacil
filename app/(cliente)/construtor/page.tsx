@@ -34,7 +34,7 @@ export default function ConstrutorPage() {
       id: novoId(),
       autor: "assistant",
       texto:
-        "E aí! 👷 Meu Construtor, especialista de obra aqui do Construfácil.\n\nMe conta o que você vai fazer que eu calculo o material certo, na quantidade certa, e já sugiro os produtos pra você jogar na sacola.",
+        "E aí! 👷 Meu Construtor, especialista de obra aqui do ConstruZap.\n\nMe conta o que você vai fazer que eu calculo o material certo, na quantidade certa, e já sugiro os produtos pra você jogar na sacola.",
     },
   ]);
   const [texto, setTexto] = useState("");

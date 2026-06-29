@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const formData = body?.formData;
-    const descricao: string = body?.descricao ?? "Pedido Construfácil";
+    const descricao: string = body?.descricao ?? "Pedido ConstruZap";
     const referencia: string | undefined = body?.referencia; // id do pedido, se houver
 
     if (!formData || typeof formData !== "object") {

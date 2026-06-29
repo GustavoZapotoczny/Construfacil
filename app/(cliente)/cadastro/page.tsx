@@ -90,7 +90,7 @@ export default function CadastroPage() {
           <div>
             <p className="text-sm font-medium text-stone-800">Sou lojista</p>
             <p className="text-xs text-stone-500">
-              Quero vender materiais no Construfácil
+              Quero vender materiais no ConstruZap
             </p>
           </div>
           <Toggle ligado={souLojista} onChange={setSouLojista} label="Sou lojista" />

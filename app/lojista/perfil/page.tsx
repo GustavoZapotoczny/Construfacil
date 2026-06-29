@@ -160,7 +160,7 @@ export default function LojistaPerfilPage() {
         </button>
 
         <p className="pb-2 text-center text-xs text-stone-400">
-          Construfácil · painel do lojista · v1.0.0
+          ConstruZap · painel do lojista · v1.0.0
         </p>
       </div>
 

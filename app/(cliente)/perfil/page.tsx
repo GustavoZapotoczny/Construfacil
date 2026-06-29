@@ -123,7 +123,7 @@ export default function PerfilPage() {
         </button>
 
         <p className="pb-2 text-center text-xs text-stone-400">
-          Construfácil · versão 1.0.0
+          ConstruZap · versão 1.0.0
         </p>
       </div>
 

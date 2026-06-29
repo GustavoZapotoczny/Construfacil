@@ -7,15 +7,15 @@ import { ServiceWorker } from "@/components/ServiceWorker";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Construfácil — Materiais de construção com entrega",
+  title: "ConstruZap — Materiais de construção com entrega",
   description:
     "Marketplace de materiais de construção com entrega na obra. Peça cimento, tijolos, tintas e ferramentas como num delivery.",
-  applicationName: "Construfácil",
+  applicationName: "ConstruZap",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Construfácil",
+    title: "ConstruZap",
   },
   icons: {
     icon: [
