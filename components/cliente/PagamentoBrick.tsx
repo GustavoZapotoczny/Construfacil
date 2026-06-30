@@ -15,15 +15,26 @@ interface PixData {
 }
 
 interface Props {
-  /** Valor total a cobrar (R$). */
+  /** Valor total exibido (R$). O valor cobrado é recalculado no servidor. */
   valor: number;
   descricao: string;
+  /** Itens do pedido — o servidor recalcula o preço a partir deles. */
+  itens: { produtoId: string; quantidade: number }[];
+  lojaId: string;
+  cupomCodigo?: string;
   /** Chamado quando o pagamento é aprovado (cartão) ou o Pix é confirmado. */
   onAprovado: (pagamentoId: string) => void;
 }
 
 /** Pagamento dentro do app via Mercado Pago (cartão + Pix), sem sair da tela. */
-export function PagamentoBrick({ valor, descricao, onAprovado }: Props) {
+export function PagamentoBrick({
+  valor,
+  descricao,
+  itens,
+  lojaId,
+  cupomCodigo,
+  onAprovado,
+}: Props) {
   const [estado, setEstado] = useState<Estado>("form");
   const [erro, setErro] = useState("");
   const [pix, setPix] = useState<PixData | null>(null);
@@ -64,7 +75,7 @@ export function PagamentoBrick({ valor, descricao, onAprovado }: Props) {
       const res = await fetch("/api/pagamento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formData, descricao }),
+        body: JSON.stringify({ formData, descricao, itens, lojaId, cupomCodigo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.erro || "Falha ao processar o pagamento.");

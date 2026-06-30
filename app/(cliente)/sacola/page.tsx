@@ -433,6 +433,12 @@ export default function SacolaPage() {
             <PagamentoBrick
               valor={total}
               descricao={`Pedido • ${loja.nome}`}
+              itens={linhas.map((l) => ({
+                produtoId: l.produto.id,
+                quantidade: l.quantidade,
+              }))}
+              lojaId={loja.id}
+              cupomCodigo={cupom?.codigo}
               onAprovado={() => concluirPedido()}
             />
           </div>
