@@ -1,6 +1,7 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
     const itens: ItemPedido[] = body?.itens;
     const lojaId: string = body?.lojaId;
     const cupomCodigo: string | undefined = body?.cupomCodigo;
+    const referencia: string | undefined = body?.referencia; // id do pedido
     const descricao: string = body?.descricao ?? "Pedido ConstruZap";
 
     if (!formData || typeof formData !== "object") {
@@ -106,14 +108,29 @@ export async function POST(req: Request) {
     const client = new MercadoPagoConfig({ accessToken });
     const payment = new Payment(client);
 
+    const origin = new URL(req.url).origin;
     const resultado = await payment.create({
       body: {
         ...formData,
         transaction_amount: valor,
         description: descricao,
+        ...(referencia ? { external_reference: referencia } : {}),
+        notification_url: `${origin}/api/webhook/mercadopago`,
       },
       requestOptions: { idempotencyKey: randomUUID() },
     });
+
+    // Cartão aprovado na hora: promove o pedido já (o Pix vem pelo webhook).
+    if (resultado.status === "approved" && referencia) {
+      const admin = getSupabaseAdmin();
+      if (admin) {
+        await admin
+          .from("pedidos")
+          .update({ status: "Novo" })
+          .eq("id", referencia)
+          .eq("status", "Aguardando pagamento");
+      }
+    }
 
     const pix = resultado.point_of_interaction?.transaction_data;
 

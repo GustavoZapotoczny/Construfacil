@@ -280,6 +280,9 @@ export interface NovoPedidoInput {
   cupomCodigo?: string;
   enderecoId?: string;
   enderecoResumo: string;
+  /** Status inicial. Padrão "Novo"; no fluxo de pagamento real usa-se
+   *  "Aguardando pagamento" (só o webhook promove para "Novo"). */
+  status?: StatusPedido;
 }
 
 /** Cria o pedido (pedidos + itens_pedido) e retorna o id. */
@@ -302,7 +305,7 @@ export async function criarPedido(input: NovoPedidoInput): Promise<string> {
       lojaId: input.loja.id,
       lojaNome: input.loja.nome,
       itens,
-      status: "Novo",
+      status: input.status ?? "Novo",
       subtotal: input.subtotal,
       frete: input.frete,
       desconto: input.desconto,
@@ -331,7 +334,7 @@ export async function criarPedido(input: NovoPedidoInput): Promise<string> {
       loja_id: input.loja.id,
       endereco_id: input.enderecoId ?? null,
       endereco_resumo: input.enderecoResumo,
-      status: "Novo",
+      status: input.status ?? "Novo",
       subtotal: input.subtotal,
       frete: input.frete,
       desconto: input.desconto,
@@ -708,6 +711,7 @@ export async function listarPedidosDaLoja(lojaId: string): Promise<Pedido[]> {
     .from("pedidos")
     .select("*, lojas(nome), itens_pedido(*)")
     .eq("loja_id", lojaId)
+    .neq("status", "Aguardando pagamento") // só pedidos pagos aparecem para a loja
     .order("criado_em", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapPedido);

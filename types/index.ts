@@ -1,4 +1,5 @@
 export type StatusPedido =
+  | "Aguardando pagamento"
   | "Novo"
   | "Em preparo"
   | "Pronto"

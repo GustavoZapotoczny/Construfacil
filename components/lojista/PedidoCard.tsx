@@ -10,6 +10,7 @@ import { Botao } from "@/components/ui/Botao";
 import { clsx } from "@/lib/cx";
 
 const CORES_STATUS: Record<StatusPedido, string> = {
+  "Aguardando pagamento": "bg-yellow-100 text-yellow-800",
   Novo: "bg-orange-100 text-orange-700",
   "Em preparo": "bg-amber-100 text-amber-700",
   Pronto: "bg-blue-100 text-blue-700",

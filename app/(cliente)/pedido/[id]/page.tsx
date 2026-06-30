@@ -21,6 +21,7 @@ const ETAPAS: StatusPedido[] = [
 ];
 
 const ROTULOS: Record<StatusPedido, string> = {
+  "Aguardando pagamento": "Aguardando pagamento",
   Novo: "Pedido recebido",
   "Em preparo": "Em preparo",
   Pronto: "Pronto para envio",

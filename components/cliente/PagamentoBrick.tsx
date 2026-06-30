@@ -22,6 +22,8 @@ interface Props {
   itens: { produtoId: string; quantidade: number }[];
   lojaId: string;
   cupomCodigo?: string;
+  /** Id do pedido (vira external_reference no Mercado Pago). */
+  referencia?: string;
   /** Chamado quando o pagamento é aprovado (cartão) ou o Pix é confirmado. */
   onAprovado: (pagamentoId: string) => void;
 }
@@ -33,6 +35,7 @@ export function PagamentoBrick({
   itens,
   lojaId,
   cupomCodigo,
+  referencia,
   onAprovado,
 }: Props) {
   const [estado, setEstado] = useState<Estado>("form");
@@ -75,7 +78,7 @@ export function PagamentoBrick({
       const res = await fetch("/api/pagamento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formData, descricao, itens, lojaId, cupomCodigo }),
+        body: JSON.stringify({ formData, descricao, itens, lojaId, cupomCodigo, referencia }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.erro || "Falha ao processar o pagamento.");

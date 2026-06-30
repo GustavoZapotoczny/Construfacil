@@ -66,6 +66,7 @@ export default function SacolaPage() {
   const [finalizando, setFinalizando] = useState(false);
   const [erroFinalizar, setErroFinalizar] = useState("");
   const [mostrarPagamento, setMostrarPagamento] = useState(false);
+  const [pedidoId, setPedidoId] = useState<string | null>(null);
 
   // Seleciona o primeiro endereço assim que a lista carrega.
   useEffect(() => {
@@ -109,46 +110,51 @@ export default function SacolaPage() {
     }
   }
 
-  function abrirPagamento() {
+  // Cria o pedido como "Aguardando pagamento" e abre a tela de pagamento.
+  // Só o pagamento confirmado (servidor/webhook) promove o pedido a "Novo".
+  async function abrirPagamento() {
     if (!loja) return;
     if (enderecos.length > 0 && !enderecoId) {
       setErroFinalizar("Selecione um endereço de entrega.");
       return;
     }
     setErroFinalizar("");
-    setMostrarPagamento(true);
+    setFinalizando(true);
+    try {
+      let id = pedidoId;
+      if (!id) {
+        const endereco = enderecos.find((e) => e.id === enderecoId);
+        id = await criarPedido({
+          loja,
+          linhas,
+          subtotal,
+          frete,
+          desconto,
+          total,
+          formaPagamento: pagamento,
+          cupomCodigo: cupom?.codigo,
+          enderecoId: endereco?.id,
+          enderecoResumo: endereco
+            ? `${endereco.rua}, ${endereco.numero} — ${endereco.apelido}`
+            : "Endereço não informado",
+          status: "Aguardando pagamento",
+        });
+        setPedidoId(id);
+      }
+      setMostrarPagamento(true);
+    } catch (e) {
+      setErroFinalizar(
+        e instanceof Error ? e.message : "Não foi possível iniciar o pagamento.",
+      );
+    } finally {
+      setFinalizando(false);
+    }
   }
 
-  // Chamado pelo PagamentoBrick quando o pagamento é confirmado (cartão/Pix).
-  async function concluirPedido() {
-    if (!loja) return;
-    setFinalizando(true);
-    const endereco = enderecos.find((e) => e.id === enderecoId);
-    try {
-      const id = await criarPedido({
-        loja,
-        linhas,
-        subtotal,
-        frete,
-        desconto,
-        total,
-        formaPagamento: pagamento,
-        cupomCodigo: cupom?.codigo,
-        enderecoId: endereco?.id,
-        enderecoResumo: endereco
-          ? `${endereco.rua}, ${endereco.numero} — ${endereco.apelido}`
-          : "Endereço não informado",
-      });
-      limpar();
-      router.push(`/pedido/${id}`);
-    } catch (e) {
-      setFinalizando(false);
-      setErroFinalizar(
-        e instanceof Error
-          ? e.message
-          : "Pagamento aprovado, mas houve um erro ao registrar o pedido. Fale com o suporte.",
-      );
-    }
+  // Chamado quando o pagamento é confirmado: limpa a sacola e abre o pedido.
+  function aposPagamento() {
+    limpar();
+    if (pedidoId) router.push(`/pedido/${pedidoId}`);
   }
 
   if (lojaId && lojaAsync.loading) return <Carregando texto="Carregando sacola…" />;
@@ -439,7 +445,8 @@ export default function SacolaPage() {
               }))}
               lojaId={loja.id}
               cupomCodigo={cupom?.codigo}
-              onAprovado={() => concluirPedido()}
+              referencia={pedidoId ?? undefined}
+              onAprovado={() => aposPagamento()}
             />
           </div>
         </div>
