@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Receipt, Package, Megaphone, Store } from "lucide-react";
+import { LayoutDashboard, Receipt, Package, Megaphone, Wallet, Store } from "lucide-react";
 import { clsx } from "@/lib/cx";
 import { useLojista } from "@/lib/lojista";
 import { authDisponivel } from "@/lib/auth";
@@ -13,6 +13,7 @@ const itens = [
   { href: "/lojista/pedidos", label: "Pedidos", icon: Receipt, badge: true },
   { href: "/lojista/produtos", label: "Produtos", icon: Package },
   { href: "/lojista/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/lojista/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/lojista/perfil", label: "Perfil", icon: Store },
 ];
 

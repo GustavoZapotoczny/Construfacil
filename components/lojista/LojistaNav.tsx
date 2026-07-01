@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Receipt, Package, Megaphone, Store } from "lucide-react";
+import { LayoutDashboard, Receipt, Package, Megaphone, Wallet, Store } from "lucide-react";
 import { clsx } from "@/lib/cx";
 import { useLojista } from "@/lib/lojista";
 import { authDisponivel } from "@/lib/auth";
@@ -20,6 +20,7 @@ const itens: ItemNav[] = [
   { href: "/lojista/pedidos", label: "Pedidos", icon: Receipt, badgeNovos: true },
   { href: "/lojista/produtos", label: "Produtos", icon: Package },
   { href: "/lojista/marketing", label: "Marketing", icon: Megaphone },
+  { href: "/lojista/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/lojista/perfil", label: "Perfil", icon: Store },
 ];
 
@@ -46,7 +47,7 @@ export function LojistaNav() {
               <Link
                 href={href}
                 className={clsx(
-                  "relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition",
+                  "relative flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-center text-[10px] font-medium leading-tight transition",
                   ativo ? "text-orange-600" : "text-stone-400",
                 )}
               >
