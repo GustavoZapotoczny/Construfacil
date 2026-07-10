@@ -34,6 +34,19 @@ export async function POST(req: Request) {
 
     const pedidoId = r.external_reference;
     if (r.status === "approved" && pedidoId) {
+      // O valor aprovado precisa cobrir o total do pedido — sem isso, um
+      // pagamento pequeno com a referência de um pedido caro o liberaria.
+      const { data: pedido } = await admin
+        .from("pedidos")
+        .select("id, total")
+        .eq("id", pedidoId)
+        .maybeSingle();
+      const valorPago = Number(r.transaction_amount) || 0;
+      const totalPedido = Number(pedido?.total) || 0;
+      if (!pedido || valorPago + 0.01 < totalPedido) {
+        return new Response("ok", { status: 200 });
+      }
+
       // Só promove se ainda estiver aguardando — idempotente.
       await admin
         .from("pedidos")

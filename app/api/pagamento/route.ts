@@ -2,6 +2,7 @@ import { MercadoPagoConfig, Payment } from "mercadopago";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +85,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!dentroDoLimite(`pagamento:${ipDaRequisicao(req)}`, 10)) {
+      return Response.json(
+        { erro: "Muitas tentativas. Aguarde um minuto e tente de novo." },
+        { status: 429 },
+      );
+    }
+
     const body = await req.json();
     const formData = body?.formData;
     const itens: ItemPedido[] = body?.itens;
@@ -103,6 +111,31 @@ export async function POST(req: Request) {
     const valor = await calcularValorAutoritativo(itens, lojaId, cupomCodigo);
     if (!(valor > 0)) {
       return Response.json({ erro: "Valor do pedido inválido." }, { status: 400 });
+    }
+
+    // Se veio uma referência de pedido, ela precisa apontar para um pedido
+    // real, ainda não pago, da mesma loja e com o MESMO total. Sem isso,
+    // alguém poderia pagar R$ 0,01 e "quitar" um pedido caro de outra compra.
+    if (referencia) {
+      const admin = getSupabaseAdmin();
+      if (admin) {
+        const { data: pedido } = await admin
+          .from("pedidos")
+          .select("id, loja_id, status, total")
+          .eq("id", referencia)
+          .maybeSingle();
+        if (
+          !pedido ||
+          pedido.status !== "Aguardando pagamento" ||
+          pedido.loja_id !== lojaId ||
+          Math.abs(Number(pedido.total) - valor) > 0.01
+        ) {
+          return Response.json(
+            { erro: "Pedido não confere com o pagamento." },
+            { status: 400 },
+          );
+        }
+      }
     }
 
     const client = new MercadoPagoConfig({ accessToken });

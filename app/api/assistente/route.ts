@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,10 +97,36 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!dentroDoLimite(`assistente:${ipDaRequisicao(req)}`, 8)) {
+      return Response.json(
+        { erro: "Muitas mensagens seguidas. Aguarde um minuto." },
+        { status: 429 },
+      );
+    }
+
     const body = await req.json();
-    const mensagem: string = body?.mensagem ?? "";
-    const historico: { role: string; content: string }[] = body?.historico ?? [];
-    const catalogo: CatalogoItem[] = (body?.catalogo ?? []).slice(0, 150);
+    // Limites de tamanho: evitam abuso de custo (prompts gigantes no Gemini).
+    const mensagem: string = String(body?.mensagem ?? "").slice(0, 2_000);
+    const historico: { role: string; content: string }[] = (
+      Array.isArray(body?.historico) ? body.historico : []
+    )
+      .slice(-20)
+      .map((m: { role: string; content: string }) => ({
+        role: m?.role === "assistant" ? "assistant" : "user",
+        content: String(m?.content ?? "").slice(0, 4_000),
+      }));
+    const catalogo: CatalogoItem[] = (
+      Array.isArray(body?.catalogo) ? body.catalogo : []
+    )
+      .slice(0, 150)
+      .map((p: CatalogoItem) => ({
+        id: String(p?.id ?? "").slice(0, 64),
+        nome: String(p?.nome ?? "").slice(0, 120),
+        categoria: p?.categoria ? String(p.categoria).slice(0, 60) : undefined,
+        preco: Number(p?.preco) || 0,
+        unidade: p?.unidade ? String(p.unidade).slice(0, 30) : undefined,
+        estoque: typeof p?.estoque === "number" ? p.estoque : undefined,
+      }));
 
     if (!mensagem.trim()) {
       return Response.json({ erro: "Mensagem vazia." }, { status: 400 });

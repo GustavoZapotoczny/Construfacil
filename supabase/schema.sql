@@ -80,7 +80,7 @@ create table if not exists public.pedidos (
   endereco_id uuid references public.enderecos on delete set null,
   endereco_resumo text,              -- snapshot do endereço de entrega
   status text not null default 'Novo'
-    check (status in ('Novo','Em preparo','Pronto','A caminho','Entregue','Concluído','Cancelado')),
+    check (status in ('Aguardando pagamento','Novo','Em preparo','Pronto','A caminho','Entregue','Concluído','Cancelado')),
   subtotal numeric not null default 0,
   frete numeric not null default 0,
   desconto numeric not null default 0,
@@ -115,6 +115,9 @@ create index if not exists idx_pedidos_loja on public.pedidos(loja_id);
 create index if not exists idx_pedidos_cliente on public.pedidos(cliente_id);
 create index if not exists idx_itens_pedido on public.itens_pedido(pedido_id);
 create index if not exists idx_cupons_loja on public.cupons(loja_id);
+
+-- Cada lojista tem UMA loja (evita duplicadas por corrida no 1º acesso)
+create unique index if not exists lojas_uma_por_dono on public.lojas(dono_id);
 
 -- ============================================================
 -- TRIGGER: cria perfil automaticamente no signup
@@ -223,14 +226,29 @@ create policy pedidos_lojista_select on public.pedidos
     exists (select 1 from public.lojas l where l.id = loja_id and l.dono_id = auth.uid())
   );
 
+-- cliente cria pedido só como não-pago: 'Aguardando pagamento' (Pix/cartão)
+-- ou 'Novo' apenas quando paga na entrega (sem pagamento online a confirmar)
 drop policy if exists pedidos_cliente_insert on public.pedidos;
 create policy pedidos_cliente_insert on public.pedidos
-  for insert with check (cliente_id = auth.uid());
+  for insert with check (
+    cliente_id = auth.uid()
+    and (
+      status = 'Aguardando pagamento'
+      or (status = 'Novo' and forma_pagamento = 'entrega')
+    )
+  );
 
--- cliente cancela o próprio; lojista avança status da sua loja
+-- cliente só CANCELA o próprio pedido (virar pago é papel do servidor);
+-- lojista avança status da sua loja
 drop policy if exists pedidos_cliente_update on public.pedidos;
 create policy pedidos_cliente_update on public.pedidos
-  for update using (cliente_id = auth.uid());
+  for update using (
+    cliente_id = auth.uid()
+    and status in ('Aguardando pagamento','Novo')
+  ) with check (
+    cliente_id = auth.uid()
+    and status = 'Cancelado'
+  );
 
 drop policy if exists pedidos_lojista_update on public.pedidos;
 create policy pedidos_lojista_update on public.pedidos
@@ -252,10 +270,19 @@ create policy itens_select on public.itens_pedido
     )
   );
 
+-- itens só entram enquanto o pedido ainda não está pago
 drop policy if exists itens_insert on public.itens_pedido;
 create policy itens_insert on public.itens_pedido
   for insert with check (
-    exists (select 1 from public.pedidos p where p.id = pedido_id and p.cliente_id = auth.uid())
+    exists (
+      select 1 from public.pedidos p
+      where p.id = pedido_id
+        and p.cliente_id = auth.uid()
+        and (
+          p.status = 'Aguardando pagamento'
+          or (p.status = 'Novo' and p.forma_pagamento = 'entrega')
+        )
+    )
   );
 
 -- ============================================================

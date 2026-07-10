@@ -1,4 +1,5 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
+import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,11 @@ export async function GET(req: Request) {
     const accessToken = process.env.MP_ACCESS_TOKEN;
     if (!accessToken) {
       return Response.json({ erro: "MP_ACCESS_TOKEN não configurado." }, { status: 500 });
+    }
+
+    // O app consulta a cada 4s (15/min); 40/min dá folga sem permitir flood.
+    if (!dentroDoLimite(`status:${ipDaRequisicao(req)}`, 40)) {
+      return Response.json({ erro: "Muitas consultas." }, { status: 429 });
     }
 
     const id = new URL(req.url).searchParams.get("id");

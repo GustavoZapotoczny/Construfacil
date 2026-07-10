@@ -73,6 +73,11 @@ export default function SacolaPage() {
     if (!enderecoId && enderecos.length) setEnderecoId(enderecos[0].id);
   }, [enderecos, enderecoId]);
 
+  // Trocou a forma de pagamento: o pedido é recriado com a forma nova.
+  useEffect(() => {
+    setPedidoId(null);
+  }, [pagamento]);
+
   const { frete, desconto, total } = useMemo(() => {
     if (!loja) return { frete: 0, desconto: 0, total: 0 };
     let frete = loja.taxaEntrega;
@@ -121,6 +126,9 @@ export default function SacolaPage() {
     setErroFinalizar("");
     setFinalizando(true);
     try {
+      // Na entrega não há pagamento online: o pedido já nasce "Novo"
+      // (liberado pra loja) e vai direto pra confirmação.
+      const naEntrega = pagamento === "entrega";
       let id = pedidoId;
       if (!id) {
         const endereco = enderecos.find((e) => e.id === enderecoId);
@@ -137,9 +145,14 @@ export default function SacolaPage() {
           enderecoResumo: endereco
             ? `${endereco.rua}, ${endereco.numero} — ${endereco.apelido}`
             : "Endereço não informado",
-          status: "Aguardando pagamento",
+          status: naEntrega ? "Novo" : "Aguardando pagamento",
         });
         setPedidoId(id);
+      }
+      if (naEntrega) {
+        limpar();
+        router.push(`/pedido/${id}`);
+        return;
       }
       setMostrarPagamento(true);
     } catch (e) {

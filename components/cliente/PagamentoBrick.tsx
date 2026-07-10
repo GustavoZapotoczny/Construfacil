@@ -46,10 +46,31 @@ export function PagamentoBrick({
 
   useEffect(() => {
     const chave = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
-    if (chave && !mpIniciado) {
+    if (!chave) {
+      setErro(
+        "Pagamento indisponível: chave do Mercado Pago não configurada.",
+      );
+      return;
+    }
+    if (!mpIniciado) {
       initMercadoPago(chave, { locale: "pt-BR" });
       mpIniciado = true;
     }
+    // Valida a chave pública — se foi rotacionada/revogada, o Brick falharia
+    // em silêncio (tela em branco). Aqui viramos isso numa mensagem clara.
+    fetch(
+      `https://api.mercadopago.com/v1/payment_methods/search?public_key=${chave}&status=active&limit=1`,
+    )
+      .then((r) => {
+        if (!r.ok) {
+          setErro(
+            "Pagamento temporariamente indisponível (credencial do Mercado Pago inválida). Tente novamente mais tarde.",
+          );
+        }
+      })
+      .catch(() => {
+        /* sem rede: o próprio Brick mostrará o erro */
+      });
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };

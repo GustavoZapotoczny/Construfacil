@@ -542,7 +542,21 @@ export async function getMinhaLoja(): Promise<Loja | null> {
     })
     .select("*")
     .single();
-  if (errNova) throw errNova;
+  if (errNova) {
+    // Duas chamadas simultâneas no 1º acesso: outra já criou a loja
+    // (índice único em dono_id) — usa a existente em vez de duplicar.
+    if (errNova.code === "23505") {
+      const { data: existente } = await supabase
+        .from("lojas")
+        .select("*")
+        .eq("dono_id", donoId)
+        .order("criado_em")
+        .limit(1)
+        .maybeSingle();
+      if (existente) return mapLoja(existente);
+    }
+    throw errNova;
+  }
   return mapLoja(nova);
 }
 
