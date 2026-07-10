@@ -238,23 +238,58 @@ create policy pedidos_cliente_insert on public.pedidos
     )
   );
 
--- cliente só CANCELA o próprio pedido (virar pago é papel do servidor);
--- lojista avança status da sua loja
+-- cliente e lojista podem editar o próprio pedido; QUAIS transições de status
+-- cada um pode fazer é validado pelo trigger pedido_transicao_valida (abaixo).
 drop policy if exists pedidos_cliente_update on public.pedidos;
 create policy pedidos_cliente_update on public.pedidos
-  for update using (
-    cliente_id = auth.uid()
-    and status in ('Aguardando pagamento','Novo')
-  ) with check (
-    cliente_id = auth.uid()
-    and status = 'Cancelado'
-  );
+  for update using (cliente_id = auth.uid())
+  with check (cliente_id = auth.uid());
 
 drop policy if exists pedidos_lojista_update on public.pedidos;
 create policy pedidos_lojista_update on public.pedidos
   for update using (
     exists (select 1 from public.lojas l where l.id = loja_id and l.dono_id = auth.uid())
   );
+
+-- Trava de transições de status por ator (escrow): o cliente só cancela (antes
+-- de pago) ou confirma recebimento ('Entregue' -> 'Concluído'); o lojista anda
+-- no fluxo de entrega mas nunca marca 'Concluído' (libera o cofre — é do
+-- comprador) nem 'Aguardando pagamento'; o servidor (service_role) é livre.
+create or replace function public.pedido_transicao_valida()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() = 'service_role' then
+    return new;
+  end if;
+  if new.status is not distinct from old.status then
+    return new;
+  end if;
+  if new.cliente_id = auth.uid() then
+    if (old.status in ('Aguardando pagamento','Novo') and new.status = 'Cancelado')
+       or (old.status = 'Entregue' and new.status = 'Concluído') then
+      return new;
+    end if;
+    raise exception
+      'Transicao de status nao permitida para o cliente (% -> %)',
+      old.status, new.status;
+  end if;
+  if new.status in ('Concluído','Aguardando pagamento') then
+    raise exception
+      'Lojista nao pode definir o status % (reservado ao comprador/servidor)',
+      new.status;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_pedido_transicao on public.pedidos;
+create trigger trg_pedido_transicao
+  before update on public.pedidos
+  for each row execute function public.pedido_transicao_valida();
 
 -- ---------- itens_pedido: seguem a dona do pedido ----------
 drop policy if exists itens_select on public.itens_pedido;
