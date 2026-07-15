@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSessao } from "@/lib/sessao";
-import { useMontado } from "@/lib/useMontado";
+import { supabase } from "@/lib/supabase";
 import { ehAdmin } from "@/lib/adminData";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { ShieldAlert } from "lucide-react";
+
+type Estado = "checando" | "ok" | "negado";
 
 /**
  * Área do administrador da plataforma. Só o e-mail admin entra; qualquer
@@ -15,15 +17,30 @@ import { ShieldAlert } from "lucide-react";
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const usuario = useSessao((s) => s.usuario);
-  const montado = useMontado();
-  const autorizado = ehAdmin(usuario?.email);
+  const [estado, setEstado] = useState<Estado>("checando");
 
   useEffect(() => {
-    if (montado && !usuario) router.replace("/login");
-  }, [montado, usuario, router]);
+    let ativo = true;
+    (async () => {
+      // 1) e-mail da sessão local (persistida); 2) fallback na sessão real.
+      let email = useSessao.getState().usuario?.email ?? null;
+      if (!email && supabase) {
+        const { data } = await supabase.auth.getUser();
+        email = data.user?.email ?? null;
+      }
+      if (!ativo) return;
+      if (!email) {
+        router.replace("/login");
+        return;
+      }
+      setEstado(ehAdmin(email) ? "ok" : "negado");
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [router]);
 
-  if (!montado) {
+  if (estado === "checando") {
     return (
       <div className="flex min-h-screen items-center justify-center text-stone-400">
         Carregando…
@@ -31,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!autorizado) {
+  if (estado === "negado") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-500">
