@@ -79,7 +79,9 @@ export function PagamentoBrick({
   function acompanharPix(pagamentoId: string) {
     pollRef.current = setInterval(async () => {
       try {
-        const r = await fetch(`/api/pagamento/status?id=${pagamentoId}`);
+        const r = await fetch(
+          `/api/pagamento/status?id=${pagamentoId}&loja=${encodeURIComponent(lojaId)}`,
+        );
         const d = await r.json();
         if (d.status === "approved") {
           if (pollRef.current) clearInterval(pollRef.current);

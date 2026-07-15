@@ -1,4 +1,5 @@
 import { createHmac } from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Client id da aplicação Mercado Pago (= id do app). */
 export const MP_CLIENT_ID = process.env.MP_CLIENT_ID || "6456779893485848";
@@ -46,4 +47,20 @@ export function verificarState(state: string): string | null {
 /** URL de retorno registrada no app do Mercado Pago. */
 export function redirectUri(origin: string): string {
   return `${origin}/api/lojista/mp/callback`;
+}
+
+/**
+ * Token de acesso da conta Mercado Pago conectada da loja (ou null se a loja
+ * ainda não conectou). Usado para cobrar na conta dela (split de pagamento).
+ */
+export async function tokenDaLoja(
+  admin: SupabaseClient,
+  lojaId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("mp_conexoes")
+    .select("access_token")
+    .eq("loja_id", lojaId)
+    .maybeSingle();
+  return (data?.access_token as string | undefined) ?? null;
 }

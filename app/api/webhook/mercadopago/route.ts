@@ -1,5 +1,6 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { tokenDaLoja } from "@/lib/mpConexao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,9 +13,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   try {
-    const accessToken = process.env.MP_ACCESS_TOKEN;
+    const platformToken = process.env.MP_ACCESS_TOKEN;
     const admin = getSupabaseAdmin();
-    if (!accessToken || !admin) return new Response("ok", { status: 200 });
+    if (!platformToken || !admin) return new Response("ok", { status: 200 });
 
     // O MP manda o id do pagamento no corpo (data.id) ou na query (?id=).
     let paymentId: string | undefined;
@@ -29,10 +30,25 @@ export async function POST(req: Request) {
     }
     if (!paymentId) return new Response("ok", { status: 200 });
 
+    // Descobre o pedido por este pagamento (gravamos mp_payment_id ao cobrar).
+    // Se a loja tem conta conectada (split), o pagamento está NA CONTA DELA —
+    // então buscamos com o token dela, não o da plataforma.
+    const { data: porPagamento } = await admin
+      .from("pedidos")
+      .select("id, loja_id, total")
+      .eq("mp_payment_id", paymentId)
+      .maybeSingle();
+
+    let accessToken = platformToken;
+    if (porPagamento?.loja_id) {
+      const sellerToken = await tokenDaLoja(admin, porPagamento.loja_id);
+      if (sellerToken) accessToken = sellerToken;
+    }
+
     const client = new MercadoPagoConfig({ accessToken });
     const r = await new Payment(client).get({ id: paymentId });
 
-    const pedidoId = r.external_reference;
+    const pedidoId = porPagamento?.id ?? r.external_reference;
     if (r.status === "approved" && pedidoId) {
       // O valor aprovado precisa cobrir o total do pedido — sem isso, um
       // pagamento pequeno com a referência de um pedido caro o liberaria.

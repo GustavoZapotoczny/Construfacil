@@ -87,6 +87,9 @@ create table if not exists public.pedidos (
   total numeric not null default 0,
   forma_pagamento text,
   cupom_codigo text,
+  mp_payment_id text,                -- id do pagamento no Mercado Pago (split)
+  repassado boolean not null default false,   -- valor já repassado à loja
+  repassado_em timestamptz,
   criado_em timestamptz not null default now()
 );
 
@@ -115,9 +118,24 @@ create index if not exists idx_pedidos_loja on public.pedidos(loja_id);
 create index if not exists idx_pedidos_cliente on public.pedidos(cliente_id);
 create index if not exists idx_itens_pedido on public.itens_pedido(pedido_id);
 create index if not exists idx_cupons_loja on public.cupons(loja_id);
+create index if not exists idx_pedidos_mp_payment on public.pedidos(mp_payment_id);
+create index if not exists idx_pedidos_repasse on public.pedidos(loja_id, status, repassado);
 
 -- Cada lojista tem UMA loja (evita duplicadas por corrida no 1º acesso)
 create unique index if not exists lojas_uma_por_dono on public.lojas(dono_id);
+
+-- Conexão da conta Mercado Pago de cada loja (split). Tokens SECRETOS: sem
+-- policies de RLS (só o servidor, com service_role, acessa).
+create table if not exists public.mp_conexoes (
+  loja_id uuid primary key references public.lojas on delete cascade,
+  mp_user_id text,
+  access_token text,
+  refresh_token text,
+  public_key text,
+  conectado_em timestamptz not null default now(),
+  atualizado_em timestamptz
+);
+alter table public.mp_conexoes enable row level security;
 
 -- ============================================================
 -- TRIGGER: cria perfil automaticamente no signup

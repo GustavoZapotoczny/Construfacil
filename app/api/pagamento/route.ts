@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
+import { COMISSAO_PERCENT, tokenDaLoja } from "@/lib/mpConexao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,8 +78,8 @@ async function calcularValorAutoritativo(
 
 export async function POST(req: Request) {
   try {
-    const accessToken = process.env.MP_ACCESS_TOKEN;
-    if (!accessToken) {
+    const platformToken = process.env.MP_ACCESS_TOKEN;
+    if (!platformToken) {
       return Response.json(
         { erro: "MP_ACCESS_TOKEN não configurado no servidor." },
         { status: 500 },
@@ -113,30 +114,40 @@ export async function POST(req: Request) {
       return Response.json({ erro: "Valor do pedido inválido." }, { status: 400 });
     }
 
+    const admin = getSupabaseAdmin();
+
     // Se veio uma referência de pedido, ela precisa apontar para um pedido
     // real, ainda não pago, da mesma loja e com o MESMO total. Sem isso,
     // alguém poderia pagar R$ 0,01 e "quitar" um pedido caro de outra compra.
-    if (referencia) {
-      const admin = getSupabaseAdmin();
-      if (admin) {
-        const { data: pedido } = await admin
-          .from("pedidos")
-          .select("id, loja_id, status, total")
-          .eq("id", referencia)
-          .maybeSingle();
-        if (
-          !pedido ||
-          pedido.status !== "Aguardando pagamento" ||
-          pedido.loja_id !== lojaId ||
-          Math.abs(Number(pedido.total) - valor) > 0.01
-        ) {
-          return Response.json(
-            { erro: "Pedido não confere com o pagamento." },
-            { status: 400 },
-          );
-        }
+    if (referencia && admin) {
+      const { data: pedido } = await admin
+        .from("pedidos")
+        .select("id, loja_id, status, total")
+        .eq("id", referencia)
+        .maybeSingle();
+      if (
+        !pedido ||
+        pedido.status !== "Aguardando pagamento" ||
+        pedido.loja_id !== lojaId ||
+        Math.abs(Number(pedido.total) - valor) > 0.01
+      ) {
+        return Response.json(
+          { erro: "Pedido não confere com o pagamento." },
+          { status: 400 },
+        );
       }
     }
+
+    // SPLIT: se a loja conectou a conta Mercado Pago dela, a cobrança é feita
+    // NA CONTA DELA e a plataforma retém a comissão (application_fee). Se a
+    // loja NÃO conectou, cai no comportamento atual (conta da plataforma) —
+    // rede de segurança para não quebrar nada.
+    const sellerToken = admin ? await tokenDaLoja(admin, lojaId) : null;
+    const usaSplit = !!sellerToken;
+    const accessToken = sellerToken || platformToken;
+    const comissao = usaSplit
+      ? Math.round(valor * (COMISSAO_PERCENT / 100) * 100) / 100
+      : 0;
 
     const client = new MercadoPagoConfig({ accessToken });
     const payment = new Payment(client);
@@ -148,21 +159,28 @@ export async function POST(req: Request) {
         transaction_amount: valor,
         description: descricao,
         ...(referencia ? { external_reference: referencia } : {}),
+        ...(usaSplit && comissao > 0 ? { application_fee: comissao } : {}),
         notification_url: `${origin}/api/webhook/mercadopago`,
       },
       requestOptions: { idempotencyKey: randomUUID() },
     });
 
+    // Guarda o id do pagamento no pedido — o webhook e a consulta de status
+    // usam isso para achar em qual conta (loja) buscar o pagamento.
+    if (referencia && admin && resultado.id) {
+      await admin
+        .from("pedidos")
+        .update({ mp_payment_id: String(resultado.id) })
+        .eq("id", referencia);
+    }
+
     // Cartão aprovado na hora: promove o pedido já (o Pix vem pelo webhook).
-    if (resultado.status === "approved" && referencia) {
-      const admin = getSupabaseAdmin();
-      if (admin) {
-        await admin
-          .from("pedidos")
-          .update({ status: "Novo" })
-          .eq("id", referencia)
-          .eq("status", "Aguardando pagamento");
-      }
+    if (resultado.status === "approved" && referencia && admin) {
+      await admin
+        .from("pedidos")
+        .update({ status: "Novo" })
+        .eq("id", referencia)
+        .eq("status", "Aguardando pagamento");
     }
 
     const pix = resultado.point_of_interaction?.transaction_data;
