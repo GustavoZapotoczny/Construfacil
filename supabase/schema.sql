@@ -251,10 +251,11 @@ create policy pedidos_lojista_update on public.pedidos
     exists (select 1 from public.lojas l where l.id = loja_id and l.dono_id = auth.uid())
   );
 
--- Trava de transições de status por ator (escrow): o cliente só cancela (antes
--- de pago) ou confirma recebimento ('Entregue' -> 'Concluído'); o lojista anda
--- no fluxo de entrega mas nunca marca 'Concluído' (libera o cofre — é do
--- comprador) nem 'Aguardando pagamento'; o servidor (service_role) é livre.
+-- Trava de transições de status (escrow), baseada na TRANSIÇÃO (não em quem
+-- age) — funciona inclusive quando o dono da loja compra da própria loja:
+--  • pedido "Aguardando pagamento" só vira "Cancelado" (pago é só via servidor);
+--  • "Concluído" (libera o cofre) só a partir de "Entregue" (comprador confirma);
+--  • ninguém volta para "Aguardando pagamento"; service_role é livre.
 create or replace function public.pedido_transicao_valida()
 returns trigger
 language plpgsql
@@ -268,19 +269,18 @@ begin
   if new.status is not distinct from old.status then
     return new;
   end if;
-  if new.cliente_id = auth.uid() then
-    if (old.status in ('Aguardando pagamento','Novo') and new.status = 'Cancelado')
-       or (old.status = 'Entregue' and new.status = 'Concluído') then
-      return new;
-    end if;
+  if old.status = 'Aguardando pagamento' and new.status <> 'Cancelado' then
     raise exception
-      'Transicao de status nao permitida para o cliente (% -> %)',
+      'Pedido aguardando pagamento so pode ser cancelado (% -> %)',
       old.status, new.status;
   end if;
-  if new.status in ('Concluído','Aguardando pagamento') then
+  if new.status = 'Aguardando pagamento' then
+    raise exception 'Nao e possivel voltar para Aguardando pagamento';
+  end if;
+  if new.status = 'Concluído' and old.status <> 'Entregue' then
     raise exception
-      'Lojista nao pode definir o status % (reservado ao comprador/servidor)',
-      new.status;
+      'So e possivel concluir (liberar) um pedido que foi entregue (% -> %)',
+      old.status, new.status;
   end if;
   return new;
 end;
