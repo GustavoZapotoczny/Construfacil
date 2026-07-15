@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { QrCode, CreditCard, Landmark, Banknote } from "lucide-react";
 import { getMinhaLoja, atualizarLoja } from "@/lib/repo";
 import { useAsync } from "@/lib/useAsync";
@@ -8,6 +8,7 @@ import { SubHeader } from "@/components/lojista/SubHeader";
 import { Toggle } from "@/components/ui/Toggle";
 import { Botao } from "@/components/ui/Botao";
 import { Carregando } from "@/components/ui/Estados";
+import { ConectarMercadoPago } from "@/components/lojista/ConectarMercadoPago";
 
 const OPCOES = [
   { id: "pix", label: "Pix", icon: QrCode },
@@ -51,7 +52,11 @@ export default function PagamentoPage() {
     <div className="min-h-screen pb-28">
       <SubHeader titulo="Formas de pagamento" />
 
-      <p className="px-4 pt-4 text-sm text-stone-500">
+      <Suspense fallback={null}>
+        <ConectarMercadoPago />
+      </Suspense>
+
+      <p className="px-4 pt-6 text-sm text-stone-500">
         Selecione as formas que sua loja aceita na entrega.
       </p>
 
