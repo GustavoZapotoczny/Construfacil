@@ -11,9 +11,11 @@ import {
   HelpCircle,
   LogOut,
   ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { useSessao } from "@/lib/sessao";
 import { sair } from "@/lib/auth";
+import { ehAdmin } from "@/lib/adminData";
 import { BottomNav } from "@/components/cliente/BottomNav";
 import { clsx } from "@/lib/cx";
 
@@ -54,6 +56,21 @@ export default function PerfilPage() {
       ],
     },
   ];
+
+  // Grupo do administrador — só aparece para o e-mail admin.
+  if (ehAdmin(usuario?.email)) {
+    grupos.push({
+      titulo: "Administração",
+      itens: [
+        {
+          icon: ShieldCheck,
+          label: "Painel do administrador",
+          href: "/admin",
+          destaque: true,
+        },
+      ],
+    });
+  }
 
   return (
     <div className="min-h-screen pb-20">
