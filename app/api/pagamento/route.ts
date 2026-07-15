@@ -76,7 +76,31 @@ async function calcularValorAutoritativo(
   return Math.round(total * 100) / 100;
 }
 
+/** Extrai uma mensagem legível de um erro do SDK do Mercado Pago. */
+function descreverErroMP(e: unknown): string {
+  const o = (e ?? {}) as { message?: string; cause?: unknown };
+  const partes: string[] = [];
+  if (o.message) partes.push(o.message);
+  if (o.cause) {
+    try {
+      partes.push(JSON.stringify(o.cause));
+    } catch {
+      /* ignora */
+    }
+  }
+  if (!partes.length) {
+    try {
+      partes.push(JSON.stringify(e));
+    } catch {
+      partes.push(String(e));
+    }
+  }
+  return partes.join(" | ").slice(0, 600);
+}
+
 export async function POST(req: Request) {
+  let usouSplit = false;
+  let splitErroDebug: string | null = null;
   try {
     const platformToken = process.env.MP_ACCESS_TOKEN;
     if (!platformToken) {
@@ -139,31 +163,42 @@ export async function POST(req: Request) {
     }
 
     // SPLIT: se a loja conectou a conta Mercado Pago dela, a cobrança é feita
-    // NA CONTA DELA e a plataforma retém a comissão (application_fee). Se a
-    // loja NÃO conectou, cai no comportamento atual (conta da plataforma) —
-    // rede de segurança para não quebrar nada.
+    // NA CONTA DELA e a plataforma retém a comissão (application_fee).
     const sellerToken = admin ? await tokenDaLoja(admin, lojaId) : null;
-    const usaSplit = !!sellerToken;
-    const accessToken = sellerToken || platformToken;
-    const comissao = usaSplit
-      ? Math.round(valor * (COMISSAO_PERCENT / 100) * 100) / 100
-      : 0;
-
-    const client = new MercadoPagoConfig({ accessToken });
-    const payment = new Payment(client);
-
     const origin = new URL(req.url).origin;
-    const resultado = await payment.create({
-      body: {
-        ...formData,
-        transaction_amount: valor,
-        description: descricao,
-        ...(referencia ? { external_reference: referencia } : {}),
-        ...(usaSplit && comissao > 0 ? { application_fee: comissao } : {}),
-        notification_url: `${origin}/api/webhook/mercadopago`,
-      },
-      requestOptions: { idempotencyKey: randomUUID() },
-    });
+
+    const criarPagamento = (token: string, comissao: number) => {
+      const client = new MercadoPagoConfig({ accessToken: token });
+      return new Payment(client).create({
+        body: {
+          ...formData,
+          transaction_amount: valor,
+          description: descricao,
+          ...(referencia ? { external_reference: referencia } : {}),
+          ...(comissao > 0 ? { application_fee: comissao } : {}),
+          notification_url: `${origin}/api/webhook/mercadopago`,
+        },
+        requestOptions: { idempotencyKey: randomUUID() },
+      });
+    };
+
+    let resultado: Awaited<ReturnType<typeof criarPagamento>> | null = null;
+
+    if (sellerToken) {
+      const comissao = Math.round(valor * (COMISSAO_PERCENT / 100) * 100) / 100;
+      try {
+        resultado = await criarPagamento(sellerToken, comissao);
+        usouSplit = true;
+      } catch (e) {
+        // Rede de segurança: se o split falhar (ex.: conta única não pode
+        // cobrar comissão de si mesma), cobra na conta da plataforma.
+        splitErroDebug = descreverErroMP(e);
+        resultado = null;
+      }
+    }
+    if (!resultado) {
+      resultado = await criarPagamento(platformToken, 0);
+    }
 
     // Guarda o id do pagamento no pedido — o webhook e a consulta de status
     // usam isso para achar em qual conta (loja) buscar o pagamento.
@@ -189,6 +224,8 @@ export async function POST(req: Request) {
       id: resultado.id,
       status: resultado.status,
       status_detail: resultado.status_detail,
+      split: usouSplit, // true = cobrado na conta da loja com comissão
+      _splitErro: splitErroDebug, // diagnóstico (por que o split caiu no fallback)
       pix: pix
         ? {
             qrCode: pix.qr_code,
@@ -199,6 +236,9 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro desconhecido";
-    return Response.json({ erro: `Falha no pagamento: ${msg}` }, { status: 500 });
+    return Response.json(
+      { erro: `Falha no pagamento: ${msg}`, _splitErro: splitErroDebug },
+      { status: 500 },
+    );
   }
 }
