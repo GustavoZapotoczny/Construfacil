@@ -1,5 +1,7 @@
 import { createHmac } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import type { PaymentResponse } from "mercadopago/dist/clients/payment/commonTypes";
 
 /** Client id da aplicação Mercado Pago (= id do app). */
 export const MP_CLIENT_ID = process.env.MP_CLIENT_ID || "6456779893485848";
@@ -63,4 +65,26 @@ export async function tokenDaLoja(
     .eq("loja_id", lojaId)
     .maybeSingle();
   return (data?.access_token as string | undefined) ?? null;
+}
+
+/**
+ * Busca um pagamento tentando cada conta informada (a primeira que encontrar
+ * vence). Necessário porque a cobrança pode estar na conta da loja (split) ou
+ * na da plataforma (quando o split não pôde ser usado).
+ */
+export async function buscarPagamento(
+  id: string,
+  tokens: (string | null | undefined)[],
+): Promise<PaymentResponse | null> {
+  for (const token of tokens) {
+    if (!token) continue;
+    try {
+      const client = new MercadoPagoConfig({ accessToken: token });
+      const r = await new Payment(client).get({ id });
+      if (r) return r;
+    } catch {
+      /* não está nesta conta — tenta a próxima */
+    }
+  }
+  return null;
 }

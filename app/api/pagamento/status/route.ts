@@ -1,7 +1,6 @@
-import { MercadoPagoConfig, Payment } from "mercadopago";
 import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { tokenDaLoja } from "@/lib/mpConexao";
+import { tokenDaLoja, buscarPagamento } from "@/lib/mpConexao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,19 +23,18 @@ export async function GET(req: Request) {
     const lojaId = params.get("loja"); // p/ pagamentos com split (conta da loja)
     if (!id) return Response.json({ erro: "id ausente." }, { status: 400 });
 
-    // Se a loja tem conta conectada, o pagamento está na conta dela.
-    let accessToken = platformToken;
+    // A cobrança pode estar na conta da loja (split) OU na da plataforma
+    // (quando o split não pôde ser usado) — procuramos nas duas.
+    let sellerToken: string | null = null;
     if (lojaId) {
       const admin = getSupabaseAdmin();
-      if (admin) {
-        const sellerToken = await tokenDaLoja(admin, lojaId);
-        if (sellerToken) accessToken = sellerToken;
-      }
+      if (admin) sellerToken = await tokenDaLoja(admin, lojaId);
     }
 
-    const client = new MercadoPagoConfig({ accessToken });
-    const payment = new Payment(client);
-    const r = await payment.get({ id });
+    const r = await buscarPagamento(id, [sellerToken, platformToken]);
+    if (!r) {
+      return Response.json({ erro: "Pagamento não encontrado." }, { status: 404 });
+    }
 
     return Response.json({ id: r.id, status: r.status, status_detail: r.status_detail });
   } catch (e) {
