@@ -33,20 +33,24 @@ export default function EnderecosPage() {
   const [criando, setCriando] = useState(false);
   const [form, setForm] = useState<Form>(vazio);
   const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState("");
 
   function abrirNovo() {
     setForm(vazio);
     setEditandoId(null);
+    setErroSalvar("");
     setCriando(true);
   }
   function abrirEdicao(e: Endereco) {
     setForm({ ...e, complemento: e.complemento ?? "" });
     setEditandoId(e.id);
+    setErroSalvar("");
     setCriando(true);
   }
   function fechar() {
     setCriando(false);
     setEditandoId(null);
+    setErroSalvar("");
   }
 
   const valido = form.apelido.trim() && form.rua.trim() && form.numero.trim();
@@ -54,12 +58,17 @@ export default function EnderecosPage() {
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!valido) return;
+    setErroSalvar("");
     setSalvando(true);
     try {
       if (editandoId) await atualizarEndereco(editandoId, form);
       else await criarEndereco(form);
       fechar();
       reload();
+    } catch (err) {
+      setErroSalvar(
+        err instanceof Error ? err.message : "Não foi possível salvar o endereço.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -67,8 +76,14 @@ export default function EnderecosPage() {
 
   async function remover(id: string) {
     if (!window.confirm("Excluir este endereço?")) return;
-    await excluirEndereco(id);
-    reload();
+    try {
+      await excluirEndereco(id);
+      reload();
+    } catch (err) {
+      setErroSalvar(
+        err instanceof Error ? err.message : "Não foi possível excluir o endereço.",
+      );
+    }
   }
 
   return (
@@ -191,6 +206,11 @@ export default function EnderecosPage() {
                   onChange={(e) => setForm({ ...form, cep: e.target.value })}
                 />
               </div>
+              {erroSalvar && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {erroSalvar}
+                </p>
+              )}
               <Botao type="submit" bloco disabled={!valido || salvando}>
                 {salvando ? "Salvando…" : "Salvar endereço"}
               </Botao>

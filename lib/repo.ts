@@ -469,7 +469,11 @@ export async function criarEndereco(e: Omit<Endereco, "id">): Promise<void> {
     return;
   }
   const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error("Faça login para salvar endereços.");
+  if (!auth.user) {
+    throw new Error(
+      "Sua sessão expirou. Saia da conta e entre de novo para salvar o endereço.",
+    );
+  }
   const { error } = await supabase.from("enderecos").insert({
     usuario_id: auth.user.id,
     apelido: e.apelido,
