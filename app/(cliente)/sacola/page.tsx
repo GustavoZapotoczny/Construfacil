@@ -164,10 +164,11 @@ export default function SacolaPage() {
     }
   }
 
-  // Chamado quando o pagamento é confirmado: limpa a sacola e abre o pedido.
+  // Chamado quando o pagamento é confirmado: limpa a sacola e leva o cliente
+  // para a lista "Meus pedidos".
   function aposPagamento() {
     limpar();
-    if (pedidoId) router.push(`/pedido/${pedidoId}`);
+    router.push("/pedidos");
   }
 
   if (lojaId && lojaAsync.loading) return <Carregando texto="Carregando sacola…" />;
