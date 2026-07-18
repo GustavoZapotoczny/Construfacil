@@ -68,23 +68,27 @@ export async function tokenDaLoja(
 }
 
 /**
- * Busca um pagamento tentando cada conta informada (a primeira que encontrar
- * vence). Necessário porque a cobrança pode estar na conta da loja (split) ou
- * na da plataforma (quando o split não pôde ser usado).
+ * Busca um pagamento tentando cada conta informada. A cobrança pode estar na
+ * conta da loja (split) OU na da plataforma (quando o split caiu no fallback),
+ * e às vezes uma conta vê "approved" enquanto a outra ainda mostra "pending" —
+ * então checamos TODAS e preferimos o resultado "approved" (definitivo).
  */
 export async function buscarPagamento(
   id: string,
   tokens: (string | null | undefined)[],
 ): Promise<PaymentResponse | null> {
+  let melhor: PaymentResponse | null = null;
   for (const token of tokens) {
     if (!token) continue;
     try {
       const client = new MercadoPagoConfig({ accessToken: token });
       const r = await new Payment(client).get({ id });
-      if (r) return r;
+      if (!r) continue;
+      if (r.status === "approved") return r; // aprovado é definitivo
+      if (!melhor) melhor = r; // guarda o 1º achado (ex.: pending)
     } catch {
       /* não está nesta conta — tenta a próxima */
     }
   }
-  return null;
+  return melhor;
 }
