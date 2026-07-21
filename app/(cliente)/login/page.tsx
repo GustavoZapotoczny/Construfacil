@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -15,6 +15,19 @@ export default function LoginPage() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [sessaoExpirou, setSessaoExpirou] = useState(false);
+
+  // Foi redirecionado para cá porque a sessão expirou? Mostra o aviso.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("sessao-expirada")) {
+        setSessaoExpirou(true);
+        sessionStorage.removeItem("sessao-expirada");
+      }
+    } catch {
+      /* sem sessionStorage: ignora */
+    }
+  }, []);
 
   async function fazerLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -64,6 +77,11 @@ export default function LoginPage() {
         onSubmit={fazerLogin}
         className="flex flex-1 flex-col gap-4 px-6 pt-8"
       >
+        {sessaoExpirou && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            Sua sessão expirou por segurança. Entre novamente para continuar.
+          </p>
+        )}
         <Campo
           label="E-mail ou celular"
           type="text"
