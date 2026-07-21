@@ -12,15 +12,17 @@ import type { StatusPedido } from "@/types";
 import { clsx } from "@/lib/cx";
 import { useRouter } from "next/navigation";
 
+// Cor da tarja por situação de pagamento: amarelo = aguardando, vermelho =
+// cancelado, verde = pago (todos os demais estados já passaram pelo pagamento).
 const CORES_STATUS: Record<StatusPedido, string> = {
   "Aguardando pagamento": "bg-yellow-100 text-yellow-800",
-  Novo: "bg-orange-100 text-orange-700",
-  "Em preparo": "bg-amber-100 text-amber-700",
-  Pronto: "bg-blue-100 text-blue-700",
-  "A caminho": "bg-indigo-100 text-indigo-700",
+  Cancelado: "bg-red-100 text-red-700",
+  Novo: "bg-green-100 text-green-700",
+  "Em preparo": "bg-green-100 text-green-700",
+  Pronto: "bg-green-100 text-green-700",
+  "A caminho": "bg-green-100 text-green-700",
   Entregue: "bg-green-100 text-green-700",
-  "Concluído": "bg-emerald-100 text-emerald-700",
-  Cancelado: "bg-stone-200 text-stone-600",
+  "Concluído": "bg-green-100 text-green-700",
 };
 
 export default function PedidosPage() {
