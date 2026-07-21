@@ -461,6 +461,10 @@ export default function SacolaPage() {
               cupomCodigo={cupom?.codigo}
               referencia={pedidoId ?? undefined}
               onAprovado={() => aposPagamento()}
+              onVerPedidos={() => {
+                limpar();
+                router.push("/pedidos");
+              }}
             />
           </div>
         </div>

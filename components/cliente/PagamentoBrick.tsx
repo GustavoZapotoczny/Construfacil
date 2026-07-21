@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
-import { Check, Copy, QrCode } from "lucide-react";
+import { Check, Copy, QrCode, ClipboardList } from "lucide-react";
 import { brl } from "@/lib/format";
 
 let mpIniciado = false;
@@ -26,6 +26,8 @@ interface Props {
   referencia?: string;
   /** Chamado quando o pagamento é aprovado (cartão) ou o Pix é confirmado. */
   onAprovado: (pagamentoId: string) => void;
+  /** Sair da tela de Pix para "Meus pedidos" (o pedido já foi criado). */
+  onVerPedidos?: () => void;
 }
 
 /** Pagamento dentro do app via Mercado Pago (cartão + Pix), sem sair da tela. */
@@ -37,6 +39,7 @@ export function PagamentoBrick({
   cupomCodigo,
   referencia,
   onAprovado,
+  onVerPedidos,
 }: Props) {
   const [estado, setEstado] = useState<Estado>("form");
   const [erro, setErro] = useState("");
@@ -157,7 +160,8 @@ export function PagamentoBrick({
           <QrCode size={18} /> Pague com Pix pra confirmar
         </p>
         <p className="text-sm text-stone-500">
-          Escaneie o QR Code no app do seu banco. A confirmação é automática.
+          Escaneie o QR Code no app do seu banco. A confirmação é automática — e
+          o Pix pode levar alguns minutos pra cair.
         </p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -176,6 +180,21 @@ export function PagamentoBrick({
           <span className="h-2 w-2 animate-pulse rounded-full bg-orange-400" />
           Aguardando o pagamento…
         </p>
+
+        {onVerPedidos && (
+          <div className="mt-2 w-full border-t border-stone-100 pt-3">
+            <p className="text-xs text-stone-500">
+              Já pagou? Pode fechar — assim que o banco confirmar, seu pedido
+              aparece em <strong>Meus pedidos</strong>.
+            </p>
+            <button
+              onClick={onVerPedidos}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700"
+            >
+              <ClipboardList size={16} /> Ver meus pedidos
+            </button>
+          </div>
+        )}
       </div>
     );
   }
