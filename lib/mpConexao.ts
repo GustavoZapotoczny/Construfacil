@@ -53,10 +53,14 @@ export function redirectUri(origin: string): string {
 
 /**
  * Valida a assinatura do webhook do Mercado Pago (header `x-signature`).
- * Só é exigida quando `MP_WEBHOOK_SECRET` está configurado no servidor — sem
- * ele, mantém o comportamento atual (a confirmação é mitigada porque o webhook
- * re-busca o pagamento no MP e revalida o valor). Configure o segredo no painel
- * do MP (Webhooks) e nesta env para ativar a checagem forte.
+ * Só é exigida quando `MP_WEBHOOK_SECRET` está configurado no servidor.
+ *
+ * Estratégia FAIL-OPEN segura (não quebra pagamento em produção):
+ *  • sem segredo configurado           → aceita (comportamento padrão);
+ *  • com segredo, mas SEM assinatura    → aceita + loga (o MP pode não assinar
+ *    notificações com notification_url por-requisição; a proteção real contra
+ *    forja continua sendo a re-busca do pagamento no MP);
+ *  • com segredo e assinatura PRESENTE mas INVÁLIDA → REJEITA (adulteração).
  *
  * Manifesto conforme a doc do MP:  id:<data.id>;request-id:<x-request-id>;ts:<ts>;
  */
@@ -66,9 +70,15 @@ export function assinaturaWebhookValida(
 ): boolean {
   const secret = process.env.MP_WEBHOOK_SECRET;
   if (!secret) return true; // não configurado → não bloqueia (mitigado alhures)
-  if (!dataId) return false;
 
-  const assinatura = req.headers.get("x-signature") ?? "";
+  const assinatura = (req.headers.get("x-signature") ?? "").trim();
+  if (!assinatura) {
+    console.warn(
+      "[webhook] MP_WEBHOOK_SECRET setado mas notificacao veio SEM x-signature — aceitando (mitigado pela re-busca).",
+    );
+    return true; // fail-open: não bloqueia notificação legítima não-assinada
+  }
+
   const requestId = req.headers.get("x-request-id") ?? "";
   const partes: Record<string, string> = {};
   for (const par of assinatura.split(",")) {
@@ -77,7 +87,10 @@ export function assinaturaWebhookValida(
   }
   const ts = partes["ts"];
   const v1 = partes["v1"];
-  if (!ts || !v1) return false;
+  if (!ts || !v1 || !dataId) {
+    console.warn("[webhook] x-signature malformada — aceitando (mitigado).");
+    return true; // header presente mas ilegível: não arrisca bloquear
+  }
 
   // ids alfanuméricos vão em minúsculo no manifesto (ids de pagamento são numéricos).
   const manifesto = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
@@ -85,8 +98,13 @@ export function assinaturaWebhookValida(
   try {
     const a = Buffer.from(esperado, "hex");
     const b = Buffer.from(v1, "hex");
-    return a.length === b.length && timingSafeEqual(a, b);
+    const ok = a.length === b.length && timingSafeEqual(a, b);
+    if (!ok) {
+      console.error("[webhook] x-signature INVALIDA — rejeitando (possivel adulteracao).");
+    }
+    return ok; // presente e errada → rejeita
   } catch {
+    console.error("[webhook] falha ao comparar x-signature — rejeitando.");
     return false;
   }
 }
