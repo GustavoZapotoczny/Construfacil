@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { tokenDaLoja, buscarPagamento } from "@/lib/mpConexao";
@@ -22,6 +23,33 @@ export async function GET(req: Request) {
     const id = params.get("id");
     const lojaId = params.get("loja"); // p/ pagamentos com split (conta da loja)
     if (!id) return Response.json({ erro: "id ausente." }, { status: 400 });
+
+    // L3: só o DONO do pedido pode consultar o status (evita endpoint aberto).
+    const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const adminAuth = getSupabaseAdmin();
+    if (!supaUrl || !anon || !adminAuth) {
+      return Response.json({ erro: "Servidor não configurado." }, { status: 500 });
+    }
+    const bearer = (req.headers.get("authorization") ?? "")
+      .replace(/^Bearer\s+/i, "")
+      .trim();
+    if (!bearer) return Response.json({ erro: "Faça login." }, { status: 401 });
+    const sbUser = createClient(supaUrl, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: u } = await sbUser.auth.getUser(bearer);
+    const userId = u.user?.id;
+    if (!userId) return Response.json({ erro: "Sessão inválida." }, { status: 401 });
+
+    const { data: dono } = await adminAuth
+      .from("pedidos")
+      .select("cliente_id")
+      .eq("mp_payment_id", id)
+      .maybeSingle();
+    if (!dono || dono.cliente_id !== userId) {
+      return Response.json({ erro: "Sem acesso a este pagamento." }, { status: 403 });
+    }
 
     // A cobrança pode estar na conta da loja (split) OU na da plataforma
     // (quando o split não pôde ser usado) — procuramos nas duas.

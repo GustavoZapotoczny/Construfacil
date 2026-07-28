@@ -1,5 +1,9 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { tokenDaLoja, buscarPagamento } from "@/lib/mpConexao";
+import {
+  tokenDaLoja,
+  buscarPagamento,
+  assinaturaWebhookValida,
+} from "@/lib/mpConexao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,18 +20,24 @@ export async function POST(req: Request) {
     const admin = getSupabaseAdmin();
     if (!platformToken || !admin) return new Response("ok", { status: 200 });
 
-    // O MP manda o id do pagamento no corpo (data.id) ou na query (?id=).
-    let paymentId: string | undefined;
+    // O MP manda o id do pagamento no corpo (data.id) ou na query (?data.id=/?id=).
+    const url = new URL(req.url);
+    let dataId: string | undefined;
     try {
       const body = await req.json();
-      paymentId = body?.data?.id ? String(body.data.id) : undefined;
+      dataId = body?.data?.id != null ? String(body.data.id) : undefined;
     } catch {
       /* corpo vazio — tenta a query abaixo */
     }
-    if (!paymentId) {
-      paymentId = new URL(req.url).searchParams.get("id") ?? undefined;
-    }
+    dataId =
+      dataId ?? url.searchParams.get("data.id") ?? undefined;
+    const paymentId = dataId ?? url.searchParams.get("id") ?? undefined;
     if (!paymentId) return new Response("ok", { status: 200 });
+
+    // L1: se MP_WEBHOOK_SECRET estiver configurado, exige assinatura válida.
+    if (!assinaturaWebhookValida(req, dataId ?? paymentId)) {
+      return new Response("assinatura invalida", { status: 401 });
+    }
 
     // Descobre o pedido por este pagamento (gravamos mp_payment_id ao cobrar).
     // Se a loja tem conta conectada (split), o pagamento está NA CONTA DELA —

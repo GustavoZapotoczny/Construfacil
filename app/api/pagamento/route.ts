@@ -1,6 +1,6 @@
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 import { COMISSAO_PERCENT, tokenDaLoja } from "@/lib/mpConexao";
@@ -167,6 +167,15 @@ export async function POST(req: Request) {
     const sellerToken = admin ? await tokenDaLoja(admin, lojaId) : null;
     const origin = new URL(req.url).origin;
 
+    // Idempotência determinística: um duplo-clique (mesmo pedido, mesmo método,
+    // mesma janela de ~10 min) reaproveita a MESMA cobrança em vez de criar
+    // duas. O 'token' do cartão é de uso único, então uma nova tentativa real
+    // (novo cartão) difere naturalmente; o Pix fica estável por pedido.
+    const idemBase = referencia
+      ? `${referencia}|${formData?.token ?? formData?.payment_method_id ?? "pix"}|${Math.floor(Date.now() / 600_000)}`
+      : randomUUID();
+    const idempotencyKey = createHash("sha256").update(String(idemBase)).digest("hex");
+
     const criarPagamento = (token: string, comissao: number) => {
       const client = new MercadoPagoConfig({ accessToken: token });
       return new Payment(client).create({
@@ -178,7 +187,7 @@ export async function POST(req: Request) {
           ...(comissao > 0 ? { application_fee: comissao } : {}),
           notification_url: `${origin}/api/webhook/mercadopago`,
         },
-        requestOptions: { idempotencyKey: randomUUID() },
+        requestOptions: { idempotencyKey },
       });
     };
 
@@ -197,7 +206,26 @@ export async function POST(req: Request) {
       }
     }
     if (!resultado) {
-      resultado = await criarPagamento(platformToken, 0);
+      try {
+        resultado = await criarPagamento(platformToken, 0);
+      } catch (e) {
+        // L5: detalhe do MP fica só no log do servidor — cliente vê msg genérica.
+        console.error(
+          "[pagamento] falha ao criar no MP:",
+          descreverErroMP(e),
+          splitErroDebug ? `| split antes: ${splitErroDebug}` : "",
+        );
+        return Response.json(
+          {
+            erro: "Não foi possível processar o pagamento agora. Tente novamente em instantes.",
+          },
+          { status: 502 },
+        );
+      }
+    }
+    if (splitErroDebug) {
+      // Diagnóstico do fallback do split: só no servidor (não vai ao cliente).
+      console.warn("[pagamento] split caiu no fallback:", splitErroDebug);
     }
 
     // Guarda o id do pagamento no pedido — o webhook e a consulta de status
@@ -225,7 +253,6 @@ export async function POST(req: Request) {
       status: resultado.status,
       status_detail: resultado.status_detail,
       split: usouSplit, // true = cobrado na conta da loja com comissão
-      _splitErro: splitErroDebug, // diagnóstico (por que o split caiu no fallback)
       pix: pix
         ? {
             qrCode: pix.qr_code,
@@ -236,9 +263,7 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro desconhecido";
-    return Response.json(
-      { erro: `Falha no pagamento: ${msg}`, _splitErro: splitErroDebug },
-      { status: 500 },
-    );
+    console.error("[pagamento] erro:", msg);
+    return Response.json({ erro: `Falha no pagamento: ${msg}` }, { status: 500 });
   }
 }

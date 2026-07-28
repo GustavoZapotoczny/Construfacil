@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { initMercadoPago, Payment } from "@mercadopago/sdk-react";
 import { Check, Copy, QrCode, ClipboardList } from "lucide-react";
 import { brl } from "@/lib/format";
+import { supabase } from "@/lib/supabase";
 
 let mpIniciado = false;
 
@@ -82,8 +83,12 @@ export function PagamentoBrick({
   function acompanharPix(pagamentoId: string) {
     pollRef.current = setInterval(async () => {
       try {
+        // O /status agora exige o token da sessão (só o dono vê o pagamento).
+        const { data: s } = (await supabase?.auth.getSession()) ?? { data: null };
+        const token = s?.session?.access_token;
         const r = await fetch(
           `/api/pagamento/status?id=${pagamentoId}&loja=${encodeURIComponent(lojaId)}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
         );
         const d = await r.json();
         if (d.status === "approved") {

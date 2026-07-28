@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import type { PaymentResponse } from "mercadopago/dist/clients/payment/commonTypes";
@@ -49,6 +49,46 @@ export function verificarState(state: string): string | null {
 /** URL de retorno registrada no app do Mercado Pago. */
 export function redirectUri(origin: string): string {
   return `${origin}/api/lojista/mp/callback`;
+}
+
+/**
+ * Valida a assinatura do webhook do Mercado Pago (header `x-signature`).
+ * Só é exigida quando `MP_WEBHOOK_SECRET` está configurado no servidor — sem
+ * ele, mantém o comportamento atual (a confirmação é mitigada porque o webhook
+ * re-busca o pagamento no MP e revalida o valor). Configure o segredo no painel
+ * do MP (Webhooks) e nesta env para ativar a checagem forte.
+ *
+ * Manifesto conforme a doc do MP:  id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+ */
+export function assinaturaWebhookValida(
+  req: Request,
+  dataId: string | undefined,
+): boolean {
+  const secret = process.env.MP_WEBHOOK_SECRET;
+  if (!secret) return true; // não configurado → não bloqueia (mitigado alhures)
+  if (!dataId) return false;
+
+  const assinatura = req.headers.get("x-signature") ?? "";
+  const requestId = req.headers.get("x-request-id") ?? "";
+  const partes: Record<string, string> = {};
+  for (const par of assinatura.split(",")) {
+    const i = par.indexOf("=");
+    if (i > 0) partes[par.slice(0, i).trim()] = par.slice(i + 1).trim();
+  }
+  const ts = partes["ts"];
+  const v1 = partes["v1"];
+  if (!ts || !v1) return false;
+
+  // ids alfanuméricos vão em minúsculo no manifesto (ids de pagamento são numéricos).
+  const manifesto = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
+  const esperado = createHmac("sha256", secret).update(manifesto).digest("hex");
+  try {
+    const a = Buffer.from(esperado, "hex");
+    const b = Buffer.from(v1, "hex");
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 /**
