@@ -4,23 +4,18 @@ import { randomUUID, createHash } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { dentroDoLimite, ipDaRequisicao } from "@/lib/rateLimit";
 import { COMISSAO_PERCENT, tokenDaLoja } from "@/lib/mpConexao";
+import { calcularPedido, type ItemPedidoEntrada } from "@/lib/calculoPedido";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MINIMO_FRETE_GRATIS = 150;
-
-interface ItemPedido {
-  produtoId: string;
-  quantidade: number;
-}
-
 /**
- * Calcula o valor a cobrar NO SERVIDOR, a partir dos preços reais do banco.
- * Nunca confia no valor enviado pelo cliente (evita adulteração do preço).
+ * Valor a cobrar NO SERVIDOR, a partir dos preços reais do banco (nunca do
+ * cliente). Usa o MESMO cálculo de /api/pedido, então o total cobrado é
+ * idêntico ao total gravado no pedido.
  */
 async function calcularValorAutoritativo(
-  itens: ItemPedido[],
+  itens: ItemPedidoEntrada[],
   lojaId: string,
   cupomCodigo?: string,
 ): Promise<number> {
@@ -28,52 +23,8 @@ async function calcularValorAutoritativo(
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) throw new Error("Supabase não configurado no servidor.");
   const sb = createClient(url, anon);
-
-  const ids = itens.map((i) => i.produtoId);
-  const { data: produtos, error } = await sb
-    .from("produtos")
-    .select("id, preco, desconto, loja_id, disponivel")
-    .in("id", ids);
-  if (error) throw new Error("Falha ao consultar produtos.");
-
-  let subtotal = 0;
-  for (const item of itens) {
-    const p = produtos?.find((x) => x.id === item.produtoId);
-    if (!p || p.disponivel === false) throw new Error("Produto indisponível.");
-    if (p.loja_id !== lojaId) throw new Error("Itens de lojas diferentes.");
-    const qtd = Math.max(1, Math.floor(Number(item.quantidade) || 0));
-    const desconto = Number(p.desconto) || 0;
-    const preco = Number(p.preco) * (1 - desconto / 100);
-    subtotal += preco * qtd;
-  }
-
-  const { data: loja } = await sb
-    .from("lojas")
-    .select("taxa_entrega")
-    .eq("id", lojaId)
-    .maybeSingle();
-  let frete = subtotal >= MINIMO_FRETE_GRATIS ? 0 : Number(loja?.taxa_entrega) || 0;
-
-  let descontoCupom = 0;
-  if (cupomCodigo) {
-    const { data: cupom } = await sb
-      .from("cupons")
-      .select("tipo, valor, ativo")
-      .eq("loja_id", lojaId)
-      .eq("codigo", String(cupomCodigo).trim().toUpperCase())
-      .eq("ativo", true)
-      .maybeSingle();
-    if (cupom) {
-      if (cupom.tipo === "frete") frete = 0;
-      else if (cupom.tipo === "percentual")
-        descontoCupom = subtotal * (Number(cupom.valor) / 100);
-      else if (cupom.tipo === "fixo")
-        descontoCupom = Math.min(Number(cupom.valor), subtotal);
-    }
-  }
-
-  const total = Math.max(0, subtotal - descontoCupom) + frete;
-  return Math.round(total * 100) / 100;
+  const calc = await calcularPedido(sb, itens, lojaId, cupomCodigo);
+  return calc.total;
 }
 
 /** Extrai uma mensagem legível de um erro do SDK do Mercado Pago. */
@@ -119,7 +70,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const formData = body?.formData;
-    const itens: ItemPedido[] = body?.itens;
+    const itens: ItemPedidoEntrada[] = body?.itens;
     const lojaId: string = body?.lojaId;
     const cupomCodigo: string | undefined = body?.cupomCodigo;
     const referencia: string | undefined = body?.referencia; // id do pedido
