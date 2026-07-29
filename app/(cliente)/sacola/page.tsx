@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCarrinho } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { getLoja, validarCupom, criarPedido, listarEnderecos } from "@/lib/repo";
 import { useAsync } from "@/lib/useAsync";
 import { usePreferencias } from "@/lib/preferencias";
@@ -119,6 +120,17 @@ export default function SacolaPage() {
   // Só o pagamento confirmado (servidor/webhook) promove o pedido a "Novo".
   async function abrirPagamento() {
     if (!loja) return;
+
+    // Login é obrigatório só AQUI (ao finalizar a compra). Se não há sessão,
+    // manda pro login e volta pra sacola — o carrinho fica salvo.
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        router.push(`/login?next=${encodeURIComponent("/sacola")}`);
+        return;
+      }
+    }
+
     if (enderecos.length > 0 && !enderecoId) {
       setErroFinalizar("Selecione um endereço de entrega.");
       return;
