@@ -6,17 +6,20 @@ import { supabase } from "@/lib/supabase";
 import { sincronizarSessao } from "@/lib/auth";
 import { useSessao } from "@/lib/sessao";
 
-// Telas que NÃO exigem sessão (não redirecionamos delas).
-const ROTAS_PUBLICAS = ["/login", "/cadastro", "/auth"];
-function ehPublica(path: string): boolean {
-  return ROTAS_PUBLICAS.some((p) => path === p || path.startsWith(`${p}/`));
+// Telas que EXIGEM sessão. O resto do app (vitrine, loja, produto, sacola,
+// assistente) é livre para navegar sem login — o login só é obrigatório ao
+// finalizar a compra (tratado na sacola) e nestas telas pessoais.
+const ROTAS_PROTEGIDAS = ["/pedidos", "/pedido", "/perfil", "/lojista", "/admin"];
+function ehProtegida(path: string): boolean {
+  return ROTAS_PROTEGIDAS.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
 /**
- * - Restaura/sincroniza a sessão do Supabase com o `useSessao`.
- * - Se a sessão do Supabase morreu (expirou) mas a tela ainda aparece
- *   "logada", manda o usuário para o /login (com aviso) em vez de deixá-lo
- *   preso numa tela onde nada salva. Em modo mock (sem Supabase) não faz nada.
+ * - Restaura/sincroniza a sessão do Supabase com o `useSessao` (para o app
+ *   saber quem está logado durante a navegação livre).
+ * - Nas telas PROTEGIDAS, se não há sessão válida (nunca logou ou expirou),
+ *   manda para o /login — voltando para a tela de origem depois (?next=).
+ *   Em modo mock (sem Supabase) não faz nada.
  */
 export function AuthBootstrap() {
   const router = useRouter();
@@ -29,7 +32,8 @@ export function AuthBootstrap() {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         useSessao.getState().sair();
-        if (!ehPublica(window.location.pathname)) router.replace("/login");
+        // Só expulsa se estiver numa tela que exige login.
+        if (ehProtegida(window.location.pathname)) router.replace("/login");
       } else {
         sincronizarSessao().catch(() => {});
       }
@@ -37,10 +41,10 @@ export function AuthBootstrap() {
     return () => data.subscription.unsubscribe();
   }, [router]);
 
-  // 2) A cada navegação para uma tela que exige login, confere se há sessão
-  //    válida. Se não há (expirou), avisa e leva ao /login.
+  // 2) Ao entrar numa tela PROTEGIDA sem sessão válida, leva ao /login
+  //    (guardando o destino para voltar depois do login).
   useEffect(() => {
-    if (!supabase || ehPublica(pathname)) return;
+    if (!supabase || !ehProtegida(pathname)) return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) return;
       const estavaLogado = !!useSessao.getState().usuario;
@@ -52,7 +56,7 @@ export function AuthBootstrap() {
           /* sem sessionStorage: só redireciona */
         }
       }
-      router.replace("/login");
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     });
   }, [pathname, router]);
 

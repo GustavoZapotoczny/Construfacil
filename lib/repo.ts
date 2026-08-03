@@ -322,43 +322,37 @@ export async function criarPedido(input: NovoPedidoInput): Promise<string> {
     return id;
   }
 
-  const { data: auth } = await supabase.auth.getUser();
-  const clienteId = auth.user?.id;
-  if (!clienteId) throw new Error("Faça login para finalizar o pedido.");
+  // O pedido é criado NO SERVIDOR (/api/pedido), que recalcula os valores a
+  // partir dos preços reais — o cliente não envia mais total/subtotal/itens de
+  // dinheiro (fecha o M1). Passamos só a lista de itens (produto + quantidade).
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) throw new Error("Faça login para finalizar o pedido.");
 
-  const { data: ped, error } = await supabase
-    .from("pedidos")
-    .insert({
-      cliente_id: clienteId,
-      cliente_nome: useSessao.getState().usuario?.nome ?? null,
-      loja_id: input.loja.id,
-      endereco_id: input.enderecoId ?? null,
-      endereco_resumo: input.enderecoResumo,
-      status: input.status ?? "Novo",
-      subtotal: input.subtotal,
-      frete: input.frete,
-      desconto: input.desconto,
-      total: input.total,
-      forma_pagamento: input.formaPagamento,
-      cupom_codigo: input.cupomCodigo ?? null,
-    })
-    .select("id")
-    .single();
-  if (error) throw error;
-
-  const linhasItens = itens.map((it) => ({
-    pedido_id: ped.id,
-    produto_id: it.produtoId,
-    nome: it.nome,
-    quantidade: it.quantidade,
-    preco_unitario: it.precoUnitario,
-  }));
-  const { error: errItens } = await supabase
-    .from("itens_pedido")
-    .insert(linhasItens);
-  if (errItens) throw errItens;
-
-  return ped.id as string;
+  const res = await fetch("/api/pedido", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      itens: input.linhas.map(({ produto, quantidade }) => ({
+        produtoId: produto.id,
+        quantidade,
+      })),
+      lojaId: input.loja.id,
+      cupomCodigo: input.cupomCodigo,
+      formaPagamento: input.formaPagamento,
+      enderecoId: input.enderecoId,
+      enderecoResumo: input.enderecoResumo,
+      clienteNome: useSessao.getState().usuario?.nome ?? null,
+    }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.id) {
+    throw new Error(data?.erro || "Não foi possível criar o pedido.");
+  }
+  return data.id as string;
 }
 
 export async function listarPedidosCliente(): Promise<Pedido[]> {

@@ -39,7 +39,21 @@ export default function LoginPage() {
       setErro(r.erro ?? "Não foi possível entrar.");
       return;
     }
-    router.push(r.tipo === "lojista" ? "/lojista" : "/home");
+    router.push(destinoPosLogin(r.tipo));
+  }
+
+  // Para onde ir depois de entrar: respeita o ?next= (ex.: voltar pra sacola),
+  // senão o destino padrão conforme o tipo de conta.
+  function destinoPosLogin(tipo?: string): string {
+    let next: string | null = null;
+    try {
+      next = new URLSearchParams(window.location.search).get("next");
+    } catch {
+      /* sem window: usa o padrão */
+    }
+    // Só aceita caminhos internos (evita open redirect para outro site).
+    if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+    return tipo === "lojista" ? "/lojista" : "/home";
   }
 
   async function loginGoogle() {
@@ -53,7 +67,7 @@ export default function LoginPage() {
     }
     // Com Supabase, o navegador é redirecionado ao Google → /auth/callback.
     // Em modo mock, a sessão já está pronta:
-    if (!authDisponivel) router.push("/home");
+    if (!authDisponivel) router.push(destinoPosLogin());
   }
 
   return (
